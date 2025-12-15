@@ -1,0 +1,2944 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鲁迅在北京 - 1920年代北京历史地点交互式地图</title>
+    <link rel="icon" href="./background.jpg" type="image/jpeg">
+    
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="./network-module.js" defer></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', '微软雅黑', 'SimSun', '宋体', 'Arial Unicode MS', 'DejaVu Sans', sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            /* 强制中文字体渲染 */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+
+            /* 优先显示用户提供的背景图片，使用相对路径并放在最上层以保证可见性 */
+            background-image: 
+                /* 实际背景图：老北京书卷意象（放在最上层） */
+                url("./background.jpg"),
+                /* 轻微纸张高光与暗角叠加层 */
+                linear-gradient(180deg, rgba(255,253,248,0.12), rgba(0,0,0,0.04)),
+                /* 细腻噪点纹理，增强纸张质感（纯CSS，无外部图片） */
+                radial-gradient(circle at 20px 30px, rgba(0,0,0,0.03) 1px, transparent 2px),
+                radial-gradient(circle at 80px 90px, rgba(139,125,107,0.02) 1px, transparent 2px);
+            /* 每层的重复与尺寸设置（对应上面的图层顺序） */
+            background-repeat: no-repeat, no-repeat, repeat, repeat;
+            background-position: center top, center top, 0 0, 0 0;
+            background-size: cover, cover, 140px 140px, 140px 140px;
+            background-attachment: fixed, fixed, scroll, scroll;
+            background-blend-mode: normal, overlay, normal, normal;
+
+            /* 兼容性回退色 */
+            background-color: #C2B68D;
+        }
+
+        .header {
+            background: transparent;
+            padding: 24px 20px;
+            text-align: center;
+            box-shadow: none;
+            backdrop-filter: none;
+            border-bottom: 2px solid #8B7D6B;
+        }
+
+        .header h1 {
+            margin: 0;
+            color: #5D4E37;
+            font-size: 28px;
+            font-weight: 600;
+            font-family: 'SimSun', '宋体', serif;
+        }
+
+        .header p {
+            margin: 10px 0 0 0;
+            color: #8B7D6B;
+            font-size: 14px;
+            font-family: 'Kaiti', '楷体', serif;
+        }
+
+        .container {
+            display: flex;
+            max-width: 1400px;
+            margin: 20px auto;
+            gap: 20px;
+            padding: 0 20px;
+            background: transparent;
+        }
+
+        .sidebar {
+            width: 280px;
+            background: rgba(245, 241, 232, 0.96);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.15);
+            backdrop-filter: blur(8px);
+            max-height: 80vh;
+            overflow-y: auto;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(139, 125, 107, 0.2);
+        }
+
+        .sidebar.collapsed {
+            width: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .toggle-btn {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 0 8px 8px 0;
+            cursor: pointer;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-btn:hover {
+            background: #2980b9;
+        }
+
+        .toggle-btn.collapsed {
+            left: 300px;
+        }
+
+        .category-section {
+            margin-bottom: 25px;
+        }
+
+        .category-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #5D4E37;
+            margin-bottom: 10px;
+            padding: 8px 10px;
+            background: transparent;
+            border-bottom: 1px dashed #C9A961;
+            border-radius: 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: 'SimSun', serif;
+        }
+
+        .category-title:hover {
+            background: rgba(201, 169, 97, 0.08);
+            border-bottom-color: #C9A961;
+        }
+
+        .category-title.active {
+            background: transparent;
+            color: #C9A961;
+            border-left: 3px solid #C9A961;
+            padding-left: 12px;
+            border-bottom: none;
+        }
+
+        .category-count {
+            background: rgba(255, 255, 255, 0.3);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .location-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .location-item {
+            padding: 8px 10px;
+            margin: 4px 0;
+            background: transparent;
+            border-left: none;
+            border-radius: 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 13px;
+            border-left: 3px solid transparent;
+            color: #5D4E37;
+            font-family: 'SimSun', serif;
+        }
+
+        .location-item:hover {
+            background: rgba(201, 169, 97, 0.08);
+            border-left-color: #C9A961;
+            color: #C9A961;
+        }
+
+        .location-item.active {
+            background: transparent;
+            color: #C9A961;
+            border-left-color: #C9A961;
+            font-weight: bold;
+        }
+
+        .map-container {
+            flex: 1;
+            background: linear-gradient(135deg, #F5F1E8 0%, #F9F5ED 100%);
+            border-radius: 4px;
+            overflow: hidden;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 8px 8px 16px rgba(0,0,0,0.15), 0 0 0 1px rgba(139,125,107,0.4);
+            position: relative;
+            border: 3px solid #8B7D6B;
+            background-image: 
+                linear-gradient(45deg, transparent 48%, rgba(139,125,107,0.02) 49%, rgba(139,125,107,0.02) 51%, transparent 52%),
+                linear-gradient(-45deg, transparent 48%, rgba(139,125,107,0.02) 49%, rgba(139,125,107,0.02) 51%, transparent 52%);
+            background-size: 30px 30px;
+            background-position: 0 0, 15px 15px;
+        }
+
+        .map-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 8px solid transparent;
+            border-image: linear-gradient(45deg, #8B7D6B 0%, #C9A961 25%, #8B7D6B 50%, #C9A961 75%, #8B7D6B 100%) 1;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .map-container::after {
+            content: '';
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            right: 12px;
+            bottom: 12px;
+            border: 1px dashed rgba(201,169,97,0.3);
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        #map {
+            width: 100%;
+            height: 80vh;
+            position: relative;
+            z-index: 0;
+        }
+
+        .stats {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(245, 241, 232, 0.96);
+            padding: 14px 16px;
+            border-radius: 2px;
+            box-shadow: 5px 5px 10px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.6);
+            z-index: 1000;
+            backdrop-filter: blur(8px);
+            border: 2px solid #8B7D6B;
+            font-family: 'SimSun', '\u5b8b\u4f53', serif;
+        }
+
+        .stats h4 {
+            margin: 0 0 8px 0;
+            color: #5D4E37;
+            font-size: 13px;
+            font-weight: bold;
+            border-bottom: 1px solid #C9A961;
+            padding-bottom: 6px;
+        }
+
+        .stats-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 6px 0;
+            font-size: 12px;
+        }
+
+        .stats-label {
+            color: #8B7D6B;
+        }
+
+        .stats-value {
+            font-weight: 600;
+            color: #C9A961;
+        }
+
+        /* 弹窗 (Modal) 样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 3% auto;
+            padding: 25px;
+            border: none;
+            width: 95%;
+            max-width: 800px;
+            max-height: 90vh;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.3s ease-out;
+            position: relative;
+            overflow-y: auto;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(50px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .close {
+            position: sticky;
+            right: 20px;
+            top: 20px;
+            color: #95a5a6;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s ease;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.9);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .close:hover {
+            color: #e74c3c;
+            background: white;
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #ecf0f1;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 20px;
+            margin: -25px -25px 20px -25px;
+            border-radius: 16px 16px 0 0;
+        }
+
+        .modal-title {
+            margin: 0;
+            color: #5D4E37;
+            font-size: 26px;
+            font-weight: 600;
+            font-family: 'SimSun', '宋体', serif;
+        }
+
+        .modal-category {
+            display: inline-block;
+            background: transparent;
+            color: #C9A961;
+            padding: 4px 10px;
+            border-radius: 0;
+            border: 1px solid #C9A961;
+            font-size: 12px;
+            margin-top: 10px;
+            font-weight: 500;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .detail-item {
+            margin-bottom: 15px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 4px;
+            border-left: none;
+            border: none;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .detail-item:hover {
+            transform: none;
+            box-shadow: none;
+            background: #ffffff;
+        }
+
+        .detail-item.primary {
+            border-left-color: transparent;
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        .detail-item.secondary {
+            border-left-color: transparent;
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        .detail-item strong {
+            display: block;
+            color: #C9A961;
+            font-family: 'Kaiti', '楷体', serif;
+            font-size: 15px;
+            margin-bottom: 6px;
+            text-transform: none;
+            letter-spacing: normal;
+            font-weight: 600;
+        }
+
+        .detail-item p {
+            margin: 0;
+            color: #333;
+            line-height: 1.8;
+            font-size: 14px;
+            word-wrap: break-word;
+            font-family: 'SimSun', '宋体', serif;
+        }
+        
+        .person-link {
+            color: #C9A961;
+            text-decoration: none;
+            border-bottom: 1px dashed #C9A961;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: rgba(201, 169, 97, 0.05);
+            padding: 2px 4px;
+            border-radius: 3px;
+            margin: 0 2px;
+        }
+        
+        .person-link:hover {
+            color: #8B7D6B;
+            background: rgba(201, 169, 97, 0.15);
+            border-bottom-color: #8B7D6B;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .detail-item .coordinate-info {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .detail-item .coordinate-info span {
+            background: rgba(201, 169, 97, 0.08);
+            padding: 4px 8px;
+            border-radius: 2px;
+            border: 1px solid #C9A961;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #5D4E37;
+        }
+
+        /* 自定义Marker图标样式（民国旧物） */
+        .custom-marker {
+            background-color: #C9A961;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            box-shadow: 4px 4px 0 rgba(0,0,0,0.12);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            opacity: 0.85;
+            mix-blend-mode: multiply;
+        }
+
+        .custom-marker:hover {
+            transform: scale(1.3);
+            background-color: #B8945A;
+            opacity: 1;
+        }
+
+        .custom-marker.active {
+            background-color: #8B7D6B;
+            box-shadow: 4px 4px 0 rgba(0,0,0,0.18);
+        }
+
+        .category-marker-居住地 { background-color: #B44C43; } /* 朱红 */
+        .category-marker-工作地 { background-color: #4A5D75; } /* 靛蓝 */
+        .category-marker-教书地 { background-color: #5F7156; } /* 竹青 */
+        .category-marker-餐饮地 { background-color: #D9A033; } /* 藤黄 */
+        .category-marker-购物地 { background-color: #9B5F90; } /* 紫檀 */
+        .category-marker-风景名胜 { background-color: #7DAE8A; } /* 松石 */
+        .category-marker-会馆 { background-color: #6B5746; } /* 古木 */
+        .category-marker-医院 { background-color: #C56A2A; } /* 古铜 */
+        .category-marker-避难所 { background-color: #8B7D6B; } /* 石墨灰 */
+        .category-marker-杂志社 { background-color: #A57C52; } /* 旧金 */
+        .category-marker-影剧院 { background-color: #8E44AD; } /* 暗紫 */
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(245, 241, 232, 0.96);
+            padding: 12px 14px;
+            border-radius: 2px;
+            box-shadow: 5px 5px 10px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.6);
+            z-index: 1000;
+            backdrop-filter: blur(8px);
+            font-size: 12px;
+            border: 2px solid #8B7D6B;
+            font-family: 'SimSun', '宋体', serif;
+            color: #5D4E37;
+            max-width: 220px;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+
+        .legend h4 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            font-weight: bold;
+            border-bottom: 1px solid #C9A961;
+            padding-bottom: 6px;
+            color: #5D4E37;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 6px 0;
+            padding: 4px 6px;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .legend-item:hover {
+            background: rgba(201, 169, 97, 0.1);
+        }
+
+        .legend-item.disabled {
+            opacity: 0.4;
+        }
+
+        .legend-marker {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            border: 1px solid #fff;
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ecf0f1;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 20px;
+            transition: border-color 0.3s ease;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            font-size: 16px;
+            color: #7f8c8d;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+                padding: 10px;
+            }
+            
+            .sidebar {
+                width: 100%;
+                max-height: none;
+            }
+            
+            .toggle-btn {
+                display: none;
+            }
+            
+            .stats {
+                position: static;
+                margin-bottom: 10px;
+            }
+            
+            .modal-content {
+                width: 98%;
+                margin: 2% auto;
+                padding: 20px;
+                max-height: 95vh;
+            }
+            
+            .modal-title {
+                font-size: 20px;
+            }
+            
+            .modal-header {
+                padding: 15px;
+                margin: -20px -20px 15px -20px;
+            }
+            
+            .close {
+                right: 15px;
+                top: 15px;
+                width: 35px;
+                height: 35px;
+                font-size: 24px;
+            }
+            
+            .detail-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            
+            .detail-item {
+                padding: 15px;
+                margin-bottom: 12px;
+            }
+            
+            .detail-item strong {
+                font-size: 13px;
+            }
+            
+            .detail-item p {
+                font-size: 13px;
+            }
+            
+            .detail-item .coordinate-info {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .modal-category {
+                font-size: 11px;
+                padding: 4px 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .modal-content {
+                padding: 15px;
+                margin: 1% auto;
+                border-radius: 12px;
+            }
+            
+            .modal-header {
+                padding: 12px;
+                margin: -15px -15px 12px -15px;
+            }
+            
+            .modal-title {
+                font-size: 18px;
+            }
+            
+            .detail-item {
+                padding: 12px;
+                margin-bottom: 10px;
+            }
+            
+            .close {
+                width: 30px;
+                height: 30px;
+                font-size: 20px;
+                right: 10px;
+                top: 10px;
+            }
+        }
+
+        @media (max-width: 320px) {
+            .modal-title {
+                font-size: 16px;
+            }
+            
+            .detail-item strong {
+                font-size: 12px;
+            }
+            
+            .detail-item p {
+                font-size: 12px;
+            }
+        }
+
+        /* -------------------------
+           民国旧物配色（土褐+米白）
+           ------------------------- */
+        :root{
+            --bg: #A89968;         /* 土褐渐变 */
+            --card: #F5F1E8;       /* 米白色 */
+            --text-main: #5D4E37;  /* 棕墨 */
+            --text-sub: #8B7D6B;   /* 棕灰 */
+            --accent: #C9A961;     /* 黄褐起香 */
+            --surface: #F9F5ED;    /* 纸张浅色 */
+            --round: 4px;
+            --shadow: 5px 5px 0 rgba(0,0,0,0.08);
+        }
+
+        .header{
+            background: rgba(245, 241, 232, 0.92);
+            padding:24px 22px;
+            border-bottom:2px solid #8B7D6B;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+        }
+
+        .header h1{ 
+            margin:0; 
+            font-size:28px; 
+            font-weight:700; 
+            color:#5D4E37;
+            font-family: 'SimSun', '宋体', serif;
+            letter-spacing: 2px;
+        }
+
+        .header p{ 
+            margin:10px 0 0; 
+            color:#8B7D6B; 
+            font-size:13px;
+            font-family: 'Kaiti', '楷体', serif;
+        }
+
+        .container{
+            display:flex;
+            max-width:1200px;
+            margin:18px auto;
+            gap:18px;
+            padding:0 14px;
+        }
+
+        /* 侧边栏 */
+        .sidebar{
+            background: rgba(245, 241, 232, 0.96);
+            border-radius: 8px;
+            padding:14px;
+            box-shadow: 5px 5px 10px rgba(0,0,0,0.15);
+            border: 1px solid rgba(139, 125, 107, 0.2);
+            width: 300px;
+            height: calc(100vh - 140px);
+            overflow:auto;
+            flex-shrink: 0;
+        }
+
+        .category-title{
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            padding:8px 10px;
+            border-bottom: 1px dashed #C9A961;
+            border-radius:0;
+            cursor:pointer;
+            transition:all .18s ease;
+            margin-bottom:8px;
+            background:transparent;
+            color: #5D4E37;
+            font-family: 'SimSun', '宋体', serif;
+            font-weight: 600;
+        }
+
+        .category-title:hover{ background: rgba(201, 169, 97, 0.08); }
+        .category-title.active{ background:transparent; color:var(--accent); border-left:3px solid var(--accent); border-bottom: none; padding-left:12px; }
+
+        .location-list{ margin:8px 0 16px 0; padding-left:0; }
+        .location-item{ padding:6px 8px; border-radius:0; cursor:pointer; font-size:13px; color:#5D4E37; border-left:3px solid transparent; transition: all 0.3s ease; }
+        .location-item:hover{ background: rgba(201, 169, 97, 0.08); border-left-color:var(--accent); color:var(--accent); }
+        .location-item.active{ color:var(--accent); border-left-color:var(--accent); font-weight:bold; }
+
+        /* 地图容器 */
+        #map{ 
+            border-radius:4px;
+            overflow:hidden;
+            min-height:720px;
+            box-shadow:var(--shadow);
+            border:1px solid rgba(139, 125, 107, 0.2);
+        }
+
+        /* 图例 & 控件 */
+        #legend{ background:var(--card); padding:12px; border-radius:4px; box-shadow: var(--shadow); border:1px solid rgba(139,125,107,0.2); }
+        .legend-item{ display:flex; gap:8px; align-items:center; padding:6px 0; font-family:'SimSun', serif; color:#5D4E37; }
+        .legend-marker{ width:14px; height:14px; border-radius:50%; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+
+        /* 按钮样式统一 */
+        .btn{ background:var(--accent); color:#fff; padding:8px 12px; border-radius:4px; border:none; cursor:pointer; font-weight:600; }
+
+        /* 模态框优化 */
+        .modal{ max-width:900px; border-radius:4px; overflow:hidden; box-shadow: 10px 10px 0 rgba(0,0,0,0.2); }
+        .modal-content{ background: #FDFBF7; background-image: linear-gradient(#E8E8E8 1px, transparent 1px); background-size: 100% 30px; border:2px solid #5D4E37; padding:20px; position:relative; }
+        .modal-title{ color:#5D4E37; font-weight:700; font-size:26px; font-family:'SimSun', serif; }
+        .detail-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+        .detail-item{ background: rgba(255,255,255,0.86); padding:10px; border-radius:4px; }
+        .detail-item strong{ color:var(--accent); font-family:'Kaiti', serif; font-size:15px; }
+
+        /* 信笺上的印章 */
+        .modal-stamp{
+            position:absolute;
+            right:18px;
+            top:18px;
+            width:72px;
+            height:72px;
+            border-radius:50%;
+            background: radial-gradient(circle at 30% 30%, rgba(201,169,97,0.95), rgba(201,169,97,0.85));
+            color: #5D4E37;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-family: 'SimSun', serif;
+            font-size:13px;
+            font-weight:600;
+            box-shadow: 5px 5px 8px rgba(0,0,0,0.15);
+            opacity:0.9;
+            transform: rotate(-8deg);
+        }
+
+        /* 图片样式 */
+        .modal-image{
+            width:100%;
+            max-height:320px;
+            object-fit:cover;
+            border:1px solid #8B7D6B;
+            display:block;
+            margin:8px 0 12px 0;
+            box-shadow: 4px 4px 0 rgba(0,0,0,0.08);
+            border-radius: 2px;
+        }
+
+        /* 签名样式 */
+        .modal-signature{
+            display:block;
+            text-align:right;
+            font-family:'Kaiti', serif;
+            color:var(--accent);
+            margin-top:12px;
+            font-size:15px;
+        }
+        .detail-item p{ font-family:'SimSun', serif; font-size:14px; color:#333; line-height:1.8; }
+
+        /* 调整小屏样式 */
+        @media (max-width: 900px){
+            .container{ flex-direction:column; }
+            #map{ min-height:520px; }
+            .sidebar{ width:100%; height:auto; }
+            .detail-grid{ grid-template-columns:1fr; }
+        }
+
+        /* 地点标签样式（用于 Leaflet tooltip） */
+        .location-label {
+            background-color: rgba(245, 241, 232, 0.98);
+            border: 1px solid rgba(139, 125, 107, 0.3);
+            border-radius: 4px;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #5D4E37;
+            white-space: nowrap;
+            box-shadow: 5px 5px 0 rgba(0,0,0,0.08);
+            font-family: 'SimSun', '宋体', serif;
+        }
+
+        .location-label::before{ display:none; }
+
+        /* ===== 社交网络关系图样式 ===== */
+        .network-modal {
+            display: none;
+            position: fixed;
+            z-index: 10001;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        .network-modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .network-container {
+            background: linear-gradient(135deg, #FFFCF8, #F5F1E8);
+            border-radius: 4px;
+            width: 92%;
+            max-width: 1400px;
+            height: 85vh;
+            box-shadow: 0 20px 60px rgba(93, 78, 55, 0.3), inset 0 1px 0 rgba(255,255,255,0.6);
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            grid-template-rows: 60px 1fr;
+            position: relative;
+            border: 2px solid #C9A961;
+            overflow: hidden;
+        }
+
+        .network-header {
+            grid-column: 1 / -1;
+            padding: 12px 24px;
+            border-bottom: 2px dashed #C9A961;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(to right, #FFFCF8, #F5F1E8);
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+        }
+
+        .network-header h2 {
+            margin: 0;
+            color: #5D4E37;
+            font-size: 20px;
+            font-family: 'KaiTi', '楷体', serif;
+            font-weight: bold;
+        }
+
+        .network-close {
+            background: none;
+            border: none;
+            color: #5D4E37;
+            font-size: 28px;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .network-close:hover {
+            color: #C9A961;
+        }
+
+        #network-graph {
+            grid-column: 1;
+            grid-row: 2;
+            background: linear-gradient(135deg, rgba(255,253,248,0.9), rgba(245,241,232,0.8));
+            position: relative;
+            overflow: hidden;
+            border-right: 2px solid #E0E0E0;
+            margin-top: 100px;
+        }
+
+        /* 网络控制面板（年份+分类） */
+        .network-controls {
+            grid-column: 1;
+            grid-row: 2;
+            position: absolute;
+            top: 60px;
+            left: 0;
+            right: 320px;
+            height: auto;
+            background: linear-gradient(to bottom, rgba(245,241,232,0.95), transparent);
+            padding: 12px 16px;
+            border-bottom: 1px solid #E0E0E0;
+            z-index: 5;
+        }
+
+        .controls-row {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .filter-box, .timeline-box {
+            font-size: 13px;
+        }
+
+        .filter-box h4, .timeline-box h4 {
+            margin: 0 0 8px 0;
+            color: #5D4E37;
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .filter-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .filter-btn {
+            padding: 6px 12px;
+            background: #F5F1E8;
+            border: 1px solid #C9A961;
+            color: #5D4E37;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .filter-btn.active {
+            background: #C9A961;
+            color: #FFFCF8;
+            font-weight: bold;
+        }
+
+        .filter-btn:hover {
+            background: #D4AF7A;
+        }
+
+        .year-slider {
+            width: 200px;
+            height: 6px;
+            accent-color: #C9A961;
+        }
+
+        .year-label {
+            color: #C9A961;
+            font-weight: bold;
+        }
+
+        /* 右侧人物侧边栏 */
+        .network-sidebar {
+            grid-column: 2;
+            grid-row: 2;
+            background: linear-gradient(to bottom, #FFFCF8, #F9F5ED);
+            border-left: 2px solid #E0E0E0;
+            overflow-y: auto;
+            padding: 16px 12px;
+            font-size: 13px;
+            box-shadow: inset 2px 0 4px rgba(0,0,0,0.03);
+        }
+
+        .sidebar-empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #999;
+            text-align: center;
+            font-size: 12px;
+        }
+
+        .sidebar-title {
+            font-size: 15px;
+            font-weight: bold;
+            color: #5D4E37;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #C9A961;
+            word-wrap: break-word;
+        }
+
+        .sidebar-meta {
+            background: #F5F1E8;
+            padding: 8px;
+            border-radius: 3px;
+            margin-bottom: 12px;
+            font-size: 12px;
+            color: #5D4E37;
+        }
+
+        .sidebar-meta p {
+            margin: 4px 0;
+        }
+
+        .sidebar-section {
+            margin-top: 12px;
+        }
+
+        .sidebar-section h4 {
+            margin: 0 0 8px 0;
+            color: #5D4E37;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .event-record {
+            background: #FFF8F0;
+            padding: 6px;
+            border-left: 2px solid #C9A961;
+            margin-bottom: 6px;
+            border-radius: 2px;
+            font-size: 11px;
+        }
+
+        .event-time {
+            color: #C9A961;
+            font-weight: bold;
+            font-size: 10px;
+        }
+
+        .event-desc {
+            color: #5D4E37;
+            margin-top: 2px;
+            line-height: 1.3;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .network-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: #5D4E37;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .network-close:hover {
+            color: #e74c3c;
+            transform: scale(1.1);
+        }
+
+        .network-legend {
+            padding: 10px 20px;
+            border-top: 1px solid #e0e0e0;
+            font-size: 12px;
+            background: #F9F5ED;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            color: #5D4E37;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        /* D3网络图节点和链接样式 */
+        .node {
+            cursor: pointer;
+            stroke: #fff;
+            stroke-width: 2px;
+        }
+
+        .node:hover {
+            stroke: #C9A961;
+            stroke-width: 3px;
+        }
+
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+            stroke-width: 1.5px;
+        }
+
+        .node-label {
+            font-size: 11px;
+            font-family: 'SimSun', '宋体', serif;
+            text-anchor: middle;
+            fill: #333;
+            pointer-events: none;
+        }
+
+        .tooltip-network {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: 'SimSun', '宋体', serif;
+            pointer-events: none;
+            z-index: 10002;
+            max-width: 200px;
+            word-wrap: break-word;
+            display: none;
+        }
+
+        .btn-network {
+            background: #C9A961;
+            color: #fff;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-family: 'SimSun', '宋体', serif;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .btn-network:hover {
+            background: #B8934D;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        /* 内联网络图样式 */
+        .inline-network-container {
+            background: linear-gradient(135deg, #F5F1E8 0%, #F9F5ED 100%);
+            border: 2px solid #8B7D6B;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 10px 0;
+            position: relative;
+            min-height: 400px;
+        }
+
+        .network-info-panel {
+            background: white;
+            border: 1px solid #E0E0E0;
+            border-radius: 4px;
+            padding: 12px;
+            margin: 10px 0;
+            max-height: 150px;
+            overflow-y: auto;
+            display: none;
+            position: absolute;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .network-info-panel.show {
+            display: block;
+        }
+
+        .network-info-title {
+            font-weight: bold;
+            color: #C9A961;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .network-info-content {
+            font-size: 12px;
+            color: #5D4E37;
+            line-height: 1.6;
+        }
+
+        .network-info-content p {
+            margin: 4px 0;
+        }
+
+        .inline-legend {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 10px 0;
+            justify-content: center;
+        }
+
+        .legend-btn {
+            padding: 6px 12px;
+            border: 2px solid;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: 'SimSun', '宋体', serif;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .legend-btn.active {
+            opacity: 1;
+            font-weight: bold;
+            transform: scale(1.05);
+        }
+
+        .legend-btn:not(.active) {
+            opacity: 0.6;
+        }
+
+        .legend-btn:hover {
+            opacity: 1;
+        }
+
+        .relation-label {
+            font-size: 11px;
+            text-anchor: middle;
+            fill: white;
+            pointer-events: none;
+            font-weight: bold;
+            font-family: 'SimSun', '宋体', serif;
+        }
+
+        .node-tooltip-inline {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: 'SimSun', '宋体', serif;
+            z-index: 200;
+            pointer-events: none;
+            max-width: 250px;
+            word-wrap: break-word;
+            display: none;
+        }
+
+        .node-tooltip-inline.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>🗺️ 鲁迅在北京 - 1920年代北京历史地点交互式地图</h1>
+        <p>探索鲁迅在北京的生活轨迹，感受历史文化的深厚底蕴</p>
+        <div id="serverAlert" style="background: #fff3cd; color: #856404; padding: 8px 12px; border-radius: 4px; margin: 10px 0; display: none; font-size: 14px;">
+            ⚠️ 当前使用文件协议运行，建议使用HTTP服务器以获得完整功能
+        </div>
+    </div>
+
+    <div class="container">
+        <button class="toggle-btn" id="toggleSidebar">☰</button>
+        
+        <div class="sidebar" id="sidebar">
+            <input type="text" class="search-box" id="searchBox" placeholder="🔍 搜索地点...">
+            
+            <div id="categoryMenu"></div>
+        </div>
+
+        <div class="map-container">
+            <div class="stats" id="stats">
+                <h4>📊 统计信息</h4>
+                <div class="stats-item">
+                    <span class="stats-label">总地点数：</span>
+                    <span class="stats-value" id="totalLocations">0</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-label">已标注：</span>
+                    <span class="stats-value" id="markedLocations">0</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-label">当前分类：</span>
+                    <span class="stats-value" id="currentCategory">全部</span>
+                </div>
+            </div>
+            
+            <div id="map"></div>
+            
+            <div class="legend" id="legend"></div>
+        </div>
+    </div>
+
+    <div id="locationModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle"></h2>
+                <span class="modal-category" id="modalCategory"></span>
+            </div>
+            <div id="modal-body" class="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- 社交网络关系图模态框（新 Force Layout + 侧边栏设计） -->
+    <div id="networkModal" class="network-modal">
+        <div class="network-container">
+            <div class="network-header">
+                <h2 id="networkTitle">鲁迅的人情罗网</h2>
+                <button class="network-close" onclick="closeNetworkModal()">&times;</button>
+            </div>
+            <!-- 控制面板（年份滑块+分类筛选）会动态插入这里 -->
+            <div id="networkControls"></div>
+            <svg id="network-graph"></svg>
+            <!-- 右侧人物详情侧边栏 -->
+            <div class="network-sidebar" id="sidebarPersonal">
+                <div class="sidebar-empty">点击人物或连线查看详情</div>
+            </div>
+            <!-- 网络图例 -->
+            <div class="network-legend" id="networkLegend"></div>
+        </div>
+    </div>
+
+   <script>
+    // 全局变量
+    let map;
+    let locationData = [];
+    let markers = [];
+    let currentFilter = '全部';
+    let imageBounds;
+
+    const IMAGE_URL = 'map_pekin1920_full.jpg';
+
+    // 类别颜色配置
+    const CATEGORY_COLORS = {
+        '居住地': '#e74c3c',
+        '工作地': '#3498db',
+        '教书地': '#2ecc71',
+        '餐饮地': '#f39c12',
+        '购物地': '#9b59b6',
+        '风景名胜': '#1abc9c',
+        '会馆': '#34495e',
+        '医院': '#e67e22',
+        '避难所': '#95a5a6',
+        '杂志社': '#16a085',
+        '影剧院': '#8e44ad'
+    };
+
+    // *** 1. 数据处理函数 ***
+    
+    function extractMainActivity(fullText) {
+        const match = fullText.match(/主要活动：(.+?)(相关人物：|现状说明：|$)/s);
+        if (match && match[1]) {
+            return match[1].trim().replace(/<br>/g, '\n').replace(/\\n/g, '\n');
+        }
+        return '暂无详细活动记载。';
+    }
+    
+    function extractRelatedPeople(fullText) {
+        const match = fullText.match(/相关人物：(.+?)(现状说明：|$)/s);
+        if (match && match[1]) {
+            const text = match[1].trim().replace(/<br>/g, '').replace(/\\n/g, '').replace(/,\s*/g, '、');
+            if (text === "无直接关联人物记载") {
+                return "无";
+            }
+            
+            // 将人物名称分割并创建可点击链接
+            const people = text.split(/、|，|,/).filter(p => p.trim());
+            const peopleLinks = people.map(person => {
+                const personName = person.trim();
+                return `<a href="relationship-network.html?person=${encodeURIComponent(personName)}" 
+                        class="person-link" 
+                        target="_blank" 
+                        title="点击查看${personName}在关系网络中的详情">${personName}</a>`;
+            }).join('、');
+            
+            return peopleLinks;
+        }
+        return '无';
+    }
+
+    function extractStatus(fullText) {
+        const match = fullText.match(/现状说明：(.+?)$/s);
+        if (match && match[1]) {
+            return match[1].trim().replace(/<br>/g, '\n').replace(/\\n/g, '\n');
+        }
+        return '暂无说明。';
+    }
+
+    function parseCSV(csvText) {
+        // 确保文本编码正确，处理可能的编码问题
+        try {
+            // 移除 BOM 标记（如果存在）- 解决中文显示为符号的问题
+            if (csvText.charCodeAt(0) === 0xFEFF) {
+                csvText = csvText.slice(1);
+                console.log('✅ 已检测并移除 UTF-8 BOM 标记');
+            }
+            
+            // 统一换行符并分割
+            const lines = csvText.trim().split(/\r?\n/);
+            if (lines.length === 0) return [];
+            
+            const headers = lines[0].split(',');
+            console.log(`📋 CSV表头: ${headers.join(', ')}`);
+            
+            const data = [];
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue; // 跳过空行
+                
+                // 处理可能包含逗号和引号的复杂字段
+                const values = [];
+                let current = '';
+                let inQuotes = false;
+                let charIndex = 0;
+                
+                while (charIndex < lines[i].length) {
+                    const char = lines[i][charIndex];
+                    
+                    if (char === '"') {
+                        // 处理双引号转义
+                        if (charIndex + 1 < lines[i].length && lines[i][charIndex + 1] === '"') {
+                            current += '"';
+                            charIndex += 2;
+                        } else {
+                            inQuotes = !inQuotes;
+                            charIndex++;
+                        }
+                    } else if (char === ',' && !inQuotes) {
+                        values.push(current.trim());
+                        current = '';
+                        charIndex++;
+                    } else {
+                        current += char;
+                        charIndex++;
+                    }
+                }
+                values.push(current.trim());
+                
+                if (values.length >= headers.length) {
+                    const row = {};
+                    headers.forEach((header, index) => {
+                        // 清理字段内容，处理HTML标签和特殊字符
+                        let value = values[index] || '';
+                        // 移除可能的BOM标记
+                        value = value.replace(/^\uFEFF/, '');
+                        // 确保中文字符正确显示
+                        row[header.trim()] = value;
+                    });
+                    
+                    // 确保Y和X坐标是有效的数字且不为空
+                    if (row.Y && row.X && row.name) {
+                        row.Y = String(row.Y).trim();
+                        row.X = String(row.X).trim();
+                        
+                        // 验证坐标格式（应该是数字字符串）
+                        if (!isNaN(row.Y) && !isNaN(row.X)) {
+                            data.push(row);
+                            
+                            // 调试前几条记录的坐标
+                            if (data.length <= 5) {
+                                console.log(`📍 记录${data.length}: ${row.name}, Y=${row.Y}, X=${row.X}, 类别=${row.category || '未分类'}`);
+                            }
+                        } else {
+                            console.warn(`⚠️ 坐标格式错误 - ${row.name}: Y=${row.Y}, X=${row.X}`);
+                        }
+                    } else {
+                        console.warn(`⚠️ 缺少必要字段 - ${row.name || '未知地点'}: Y=${row.Y}, X=${row.X}`);
+                    }
+                }
+            }
+            console.log(`🔍 解析CSV完成，共解析 ${data.length} 条有效记录`);
+            return data;
+        } catch (error) {
+            console.error('❌ CSV解析错误:', error);
+            return [];
+        }
+    }
+    
+    async function loadCSV(filePath) {
+        // 检测当前协议
+        const isFileProtocol = window.location.protocol === 'file:';
+        
+        if (!isFileProtocol) {
+            try {
+                // 使用HTTP服务器加载
+                const response = await fetch(filePath);
+                if (!response.ok) {
+                    throw new Error(`无法找到或加载 CSV 文件: ${response.statusText}`);
+                }
+                const text = await response.text();
+                console.log(`📁 使用HTTP服务器加载CSV成功，文件大小: ${text.length} 字符`);
+                const data = parseCSV(text);
+                
+                if (data.length >= 10) {
+                    return data;
+                } else {
+                    console.warn(`⚠️ 解析的数据太少 (${data.length} 条)，使用备用数据`);
+                    return getCSVDataFallback();
+                }
+            } catch (fetchError) {
+                console.warn(`🔄 HTTP加载失败: ${fetchError.message}，尝试其他方法`);
+            }
+        } else {
+            console.log(`📁 检测到file://协议，CORS限制，直接使用备用数据`);
+        }
+        
+        // 对于file://协议或HTTP失败的情况，提供多种解决方案
+        try {
+            return await loadCSVAlternativeMethods();
+        } catch (error) {
+            console.error(`❌ 所有加载方法都失败，使用内置备用数据`);
+            return getCSVDataFallback();
+        }
+    }
+
+    async function loadCSVAlternativeMethods() {
+        // 方法1：尝试使用FileReader API
+        try {
+            return await loadCSVUsingFileReader();
+        } catch (error) {
+            console.warn(`🔄 FileReader方法失败: ${error.message}`);
+        }
+        
+        // 方法2：尝试内联CSV数据（如果存在）
+        try {
+            const inlineData = await loadInlineData();
+            if (inlineData && inlineData.length >= 10) {
+                console.log(`📁 使用内联数据成功`);
+                return inlineData;
+            }
+        } catch (error) {
+            console.warn(`🔄 内联数据方法失败: ${error.message}`);
+        }
+        
+        // 方法3：抛出错误，使用fallback数据
+        throw new Error(`所有备用加载方法都失败`);
+    }
+
+    // 从script标签加载内联CSV数据
+    async function loadInlineData() {
+        const scriptElement = document.getElementById('csv-data-script');
+        if (scriptElement) {
+            try {
+                const csvData = scriptElement.textContent;
+                return parseCSV(csvData);
+            } catch (error) {
+                console.error(`解析内联CSV数据失败:`, error);
+                return null;
+            }
+        }
+        return null;
+    }
+    
+    // 使用FileReader API加载CSV
+    async function loadCSVUsingFileReader() {
+        return new Promise((resolve, reject) => {
+            const csvPath = '地点数据_数据库格式.csv';
+            
+            // 创建一个隐藏的input元素来选择文件
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.csv';
+            fileInput.style.display = 'none';
+            
+            fileInput.onchange = function(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        console.log(`📁 使用FileReader API加载CSV成功`);
+                        resolve(parseCSV(e.target.result));
+                    };
+                    reader.onerror = function() {
+                        reject(new Error('FileReader读取文件失败'));
+                    };
+                    reader.readAsText(file, 'UTF-8');
+                } else {
+                    reject(new Error('未选择文件'));
+                }
+            };
+            
+            // 如果是file://协议，提示用户选择文件
+            if (window.location.protocol === 'file:') {
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0,0,0,0.8);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 10000;
+                `;
+                
+                modal.innerHTML = `
+                    <div style="background: white; padding: 30px; border-radius: 10px; text-align: center; max-width: 500px;">
+                        <h3 style="color: #e74c3c; margin-bottom: 20px;">📂 需要选择CSV文件</h3>
+                        <p style="margin-bottom: 20px; color: #555;">
+                            由于浏览器安全限制，请手动选择CSV文件：<br>
+                            <strong>地点数据_数据库格式.csv</strong>
+                        </p>
+                        <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 15px;">
+                            <button id="selectFileBtn" style="padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                                选择CSV文件
+                            </button>
+                            <button id="cancelFileSelection" style="padding: 10px 20px; background: #95a5a6; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                                使用示例数据
+                            </button>
+                        </div>
+                        <p style="color: #7f8c8d; font-size: 12px;">
+                            提示：如需完整功能，请使用HTTP服务器运行此页面
+                        </p>
+                    `;
+                
+                document.body.appendChild(modal);
+                
+                document.getElementById('selectFileBtn').onclick = function() {
+                    fileInput.click();
+                };
+                
+                // 将reject函数保存到全局，以便用户取消时调用
+                window.rejectFileSelection = reject;
+                
+                // 添加取消按钮功能
+                setTimeout(() => {
+                    const cancelBtn = document.querySelector('#cancelFileSelection');
+                    if (cancelBtn) {
+                        cancelBtn.onclick = function() {
+                            document.body.removeChild(modal);
+                            // 用户选择使用示例数据，调用fallback
+                            resolve(getCSVDataFallback());
+                        };
+                    }
+                }, 100);
+            } else {
+                reject(new Error('未知协议'));
+            }
+        });
+    }
+    
+    // 备用CSV数据（前几条记录作为示例）
+    function getCSVDataFallback() {
+        console.log(`⚠️ 使用内置示例数据（92条记录）`);
+        return [
+            {
+                id: '001',
+                name: '绍兴县馆',
+                Y: '2421',
+                X: '1412',
+                category: '居住地',
+                address: '宣武门外南半截胡同路西（现门牌 7 号，属北京宣武区文物保护单位）',
+                zoom: '1',
+                short_text: '绍兴县馆（1912.5.6-1919.11.21（居住 7 年半））',
+                full_text: '<strong>地点名称：</strong>绍兴县馆<br><strong>详细地址：</strong>宣武门外南半截胡同路西（现门牌 7 号，属北京宣武区文物保护单位）<br><strong>地点类型：</strong>居住地<br><strong>时间段：</strong>1912.5.6-1919.11.21（居住 7 年半）<br><strong>相关历史事件：</strong>新文化运动<br><strong>主要活动：</strong>1912.5.6 从长发客栈迁入，初住藤花馆西房，1916.5.6 因邻居喧哗移入补树书屋；1918 年钱玄同多次到访，引发《狂人日记》创作，首次大规模以 "鲁迅" 笔名公开发表；辑校《嵇康集》《谢承后汉书》等古籍，研究金石学，频繁出入琉璃厂购拓片（1915-1919 年购五千至六千件）；<br><strong>相关人物：</strong>钱玄同、周作人、许寿裳、李慈铭<br><strong>现状说明：</strong>1. "藤花馆已改建；补树书屋前槐树于近代不存（资料记载为1949年被雷击）；2. 鲁迅住室大体位置未变；3. 现为居民大杂院，属宣武区文物保护单位<br><strong>相关作品：</strong>《狂人日记》《孔乙己》《药》《明天》（小说）；《我之节烈观》《我们现在怎样做父亲》（杂文）；《嵇康集》（校勘）；《呐喊?自序》<br><strong>备注：</strong>居住 7 年半',
+                images: '',
+                audio: '',
+                route_ids: '',
+                source: '《鲁迅与他的北京》'
+            },
+            {
+                id: '002',
+                name: '八道湾 11 号',
+                Y: '5442',
+                X: '2108',
+                category: '居住地',
+                address: '西直门内公用库八道湾（进胡同 50 米后开阔处）',
+                zoom: '1',
+                short_text: '八道湾 11 号（1919.11.21-1923.8.2（居住近 4 年））',
+                full_text: '<strong>地点名称：</strong>八道湾 11 号<br><strong>详细地址：</strong>西直门内公用库八道湾（进胡同 50 米后开阔处）<br><strong>地点类型：</strong>居住地<br><strong>时间段：</strong>1919.11.21-1923.8.2（居住近 4 年）<br><strong>相关历史事件：</strong>五四运动<br><strong>主要活动：</strong>1919 年觅屋 15 次，8 月从罗姓手中购屋，11 月 4 日收房，11 月 21 日与周作人夫妇迁入，12 月接母亲、朱安及周建人一家同住，修缮时接入自来水系统；1921 年创作《阿 Q 正传》，出版首部小说集《呐喊》；1922 年译俄国盲诗人爱罗先珂在北大平民夜校演唱的歌词《俄国的豪杰》；因与周作人家庭矛盾和兄弟决裂，1923 年夏离开<br><strong>相关人物：</strong>周作人、羽太信子、胡适、毛泽东<br><strong>现状说明：</strong>1. 周作人一家住至 "文革" 后，1985 年周丰一搬走；2. 院门、隔墙已拆，院内盖小厨房，主建筑未变；3. 1996 年有关部门决定保留院落，后续住户已搬迁<br><strong>相关作品：</strong>《阿 Q 正传》《风波》《头发的故事》《故乡》（小说）；《呐喊》（小说集）；《鸭的喜剧》（短篇小说）；《中国小说史略》（上卷）<br><strong>备注：</strong>居住近 4 年',
+                images: '',
+                audio: '',
+                route_ids: '',
+                source: '《鲁迅与他的北京》'
+            },
+            {
+                id: '003',
+                name: '砖塔胡同 61 号（现 84 号）',
+                Y: '4263',
+                X: '1260',
+                category: '居住地',
+                address: '西四南大街丁字路口南侧（万松老人塔旁，砖塔胡同为北京最古老胡同之一）',
+                zoom: '1',
+                short_text: '砖塔胡同 61 号（现 84 号）（1923.8.2-1924.5.25（居住 9 个多月））',
+                full_text: '<strong>地点名称：</strong>砖塔胡同 61 号（现 84 号）<br><strong>详细地址：</strong>西四南大街丁字路口南侧（万松老人塔旁，砖塔胡同为北京最古老胡同之一）<br><strong>地点类型：</strong>居住地<br><strong>时间段：</strong>1923.8.2-1924.5.25（居住 9 个多月）<br><strong>相关历史事件：</strong>女师大风潮<br><strong>主要活动：</strong>1923.8.2 因兄弟失和迁入，住 3 间北房，俞家姐妹住西房，东房为女工住室及公用厨房；1923.9-11 患肺病（病程 40 天），病中坚持创作；1924 年春写《祝福》《在酒楼上》等小说，完成《娜拉走后怎样》《未有天才之前》讲演稿；1923.10 底找好西三条房子，办理买房手续并修缮，1924.5.25 迁出<br><strong>相关人物：</strong>许羡苏、俞芬、俞芳、马幼渔<br><strong>现状说明：</strong>1. 朝北大门改朝西，门道改住房；2. 原三间北房已于1981年拆除并重建（原貌改动较大）；3. 现为民居，原貌改动大但属重要遗迹<br><strong>相关作品：</strong>《祝福》《在酒楼上》《幸福的家庭》《肥皂》（小说）；《娜拉走后怎样》《未有天才之前》（讲演稿）；《嵇康集》（校勘）；《中国小说史略》（下卷）<br><strong>备注：</strong>居住 9 个多月',
+                images: '',
+                audio: '',
+                route_ids: '',
+                source: '《鲁迅与他的北京》'
+            },
+            {
+                id: '004',
+                name: '西三条 21 号',
+                Y: '4540',
+                X: '975',
+                category: '居住地',
+                address: '阜成门内大街路北（东近白塔寺，占地近 400 平方米）',
+                zoom: '1',
+                short_text: '西三条 21 号（1924.5.25-1926.8.26（居住 2 年 3 个月）；、）',
+                full_text: '<strong>地点名称：</strong>西三条 21 号<br><strong>详细地址：</strong>阜成门内大街路北（东近白塔寺，占地近 400 平方米）<br><strong>地点类型：</strong>居住地<br><strong>时间段：</strong>1924.5.25-1926.8.26（居住 2 年 3 个月）；、<br><strong>相关历史事件：</strong>三一八惨案<br><strong>主要活动：</strong>1923.10.30 购屋（借款 800 元，向许寿裳、齐寿山各借 400 元），亲自绘施工草图改建；1924.5.25 迁入，北房堂屋接 \"老虎尾巴\" 作工作室；1925 年支持女师大风潮，任校务维持会成员，在宗帽胡同 33 号（原 14 号）临时校舍义务授课，课时增至双倍；1926 年 \"三一八\" 惨案后写《纪念刘和珍君》，后避难山本医院；1926.8.26 离京南下厦门；1932.11 回平探亲时在院中桂花树下留影<br><strong>相关人物：</strong>许广平、刘和珍、齐寿山、司徒乔<br><strong>现状说明：</strong>1950 年 2 月文化部接管，3 月许广平捐文物；1951 年郭沫若题 \"鲁迅故居\"，1956 年东侧建鲁迅博物馆；1979 年 8 月列为市级文保单位<br><strong>相关作品：</strong>《野草》（散文诗全集）；《彷徨》（含《长明灯》《离婚》等 7 篇）；《华盖集》《华盖集续编》（杂文集）；《纪念刘和珍君》《死地》（杂文）<br><strong>备注：</strong>居住 2 年 3 个月',
+                images: '',
+                audio: '',
+                route_ids: '',
+                source: '《鲁迅与他的北京》'
+            },
+            {
+                id: '005',
+                name: '教育部',
+                Y: '3406',
+                X: '1463',
+                category: '工作地',
+                address: '原清政府学部旧址，西单南面路西（原敬谨亲王府，现武警西单招待所）',
+                zoom: '1',
+                short_text: '教育部（1912.5.6-1926.8.26（任职 14 年））',
+                full_text: '<strong>地点名称：</strong>教育部<br><strong>详细地址：</strong>原清政府学部旧址，西单南面路西（原敬谨亲王府，现武警西单招待所）<br><strong>地点类型：</strong>工作地<br><strong>时间段：</strong>1912.5.6-1926.8.26（任职 14 年）<br><strong>相关历史事件：</strong>新教育改革与文化保护<br><strong>主要活动：</strong>1. 任社会教育司第一科科长、"荐任佥事"，分管博物馆、图书馆、美术、文艺事务；2. 1912 年主讲 "夏期讲演会"《美术略论》，1913 年拟《播布美术意见书》；3. 筹建图书馆、博物馆，参与设计国徽、统一注音字母；4. 1925 年因支持女师大风潮被章士钊免职，后胜诉复职<br><strong>相关人物：</strong>蔡元培、夏曾佑、齐寿山、许寿裳<br><strong>现状说明：</strong>1. 原建筑大部分拆除，仅存后罩房二层小楼及部分长廊；2. 现改为武警西单招待所，红漆大门、石狮子保留<br><strong>备注：</strong>任职 14 年',
+                images: '',
+                audio: '',
+                route_ids: '',
+                source: '《鲁迅与他的北京》'
+            },
+            {
+                id: '006',
+                name: '教育部',
+                Y: '3406',
+                X: '1463',
+                category: '工作地',
+                address: '原清政府学部旧址，西单南面路西（原敬谨亲王府，现武警西单招待所）',
+                zoom: '1',
+                short_text: '教育部（1912.5.6-1926.8.26（任职 14 年））',
+                full_text: '<strong>地点名称：</strong>教育部<br><strong>详细地址：</strong>原清政府学部旧址，西单南面路西（原敬谨亲王府，现武警西单招待所）<br><strong>地点类型：</strong>工作地<br><strong>时间段：</strong>1912.5.6-1926.8.26（任职 14 年）<br><strong>相关历史事件：</strong>新教育改革与文化保护<br><strong>主要活动：</strong>1. 任社会教育司第一科科长、"荐任佥事"，分管博物馆、图书馆、美术、文艺事务；2. 1912 年主讲 "夏期讲演会"《美术略论》，1913 年拟《播布美术意见书》；3. 筹建图书馆、博物馆，参与设计国徽、统一注音字母；4. 1925 年因支持女师大风潮被章士钊免职，后胜诉复职<br><strong>相关人物：</strong>蔡元培、夏曾佑、齐寿山、许寿裳<br><strong>现状说明：</strong>1. 原建筑大部分拆除，仅存后罩房二层小楼及部分长廊；2. 现改为武警西单招待所，红漆大门、石狮子保留<br><strong>备注：</strong>任职 14 年',
+                images: '',
+                audio: '',
+                route_ids: '',
+                source: '《鲁迅与他的北京》'
+            },
+            {
+                id: '007',
+                name: '京师图书馆（含广化寺、国子监南学址）',
+                Y: '5445',
+                X: '3151',
+                category: '工作地',
+                address: '1. 初址：什刹海后海北岸广化寺（1912.8-1917.1）；2. 迁址：方家胡同国子监南学（1917.1-1928）',
+                zoom: '1',
+                short_text: '京师图书馆（含广化寺、国子监南学址）（1912.8-1926.8（主管与视察））',
+                full_text: '<strong>地点名称：</strong>京师图书馆（含广化寺、国子监南学址）<br><strong>详细地址：</strong>1. 初址：什刹海后海北岸广化寺（1912.8-1917.1）；2. 迁址：方家胡同国子监南学（1917.1-1928）<br><strong>地点类型：</strong>工作地<br><strong>时间段：</strong>1912.8-1926.8（主管与视察）<br><strong>相关历史事件：</strong>清末图书馆运动<br><strong>主要活动：</strong>1. 主管图书馆事务，多次赴广化寺视察，阅敦煌石室唐人写经、宋元刻本；2. 推动馆藏扩充，协调调入国子监南学藏书、承德文津阁《四库全书》；3. 1913 年参与迁馆选址，1917 年 1 月参加方家胡同新馆开馆典礼；4. 推荐宋紫佩 1913 年到京师图书分馆工作<br><strong>相关人物：</strong>江瀚、缪荃孙、宋紫佩<br><strong>现状说明：</strong>1. 广化寺现为北京市佛教协会办公地，主体建筑保存；2. 方家胡同国子监南学旧址现被方家胡同小学、北京第一四三中学占用，原 "京师图书馆" 门额存校内<br><strong>备注：</strong>主管与视察',
+                images: '',
+                audio: '',
+                route_ids: '',
+                source: '《鲁迅与他的北京》'
+            },
+            {
+                id: '008',
+                name: '通俗图书馆',
+                Y: '3213',
+                X: '1476',
+                category: '工作地',
+                address: '1. 初址：宣武门内路西（1913.10-1917.8）；2. 迁址：中央公园大殿（今中山公园中山堂，1917.8-1919）；3. 再迁址：宣武门内头发胡同 22 号（原清朝翰林讲习馆旧址，1919 后）',
+                zoom: '1',
+                short_text: '通俗图书馆（1913.10-1926.8（主管与检查））',
+                full_text: '<strong>地点名称：</strong>通俗图书馆<br><strong>详细地址：</strong>1. 初址：宣武门内路西（1913.10-1917.8）；2. 迁址：中央公园大殿（今中山公园中山堂，1917.8-1919）；3. 再迁址：宣武门内头发胡同 22 号（原清朝翰林讲习馆旧址，1919 后）<br><strong>地点类型：</strong>工作地<br><strong>时间段：</strong>1913.10-1926.8（主管与检查）<br><strong>相关历史事件：</strong>新文化运动<br><strong>主要活动：</strong>1. 1913 年 10 月参与创办，分普通图书、儿童图书两类，附设儿童体育场；2. 1914 年同徐吉轩到馆小坐、同许季上检阅小说，多次到馆检查工作；3. 向馆内赠《炭画》《新青年》等书；4. 1919 年后与通俗教育馆共用宣武门内头发胡同 22 号部分场所<br><strong>相关人物：</strong>王仲猷、徐吉轩、许季上<br><strong>现状说明：</strong>1. 头发胡同 22 号旧址现为北京京剧院宿舍，四合院格局保留；2. 中央公园大殿现为中山堂<br><strong>备注：</strong>主管与检查',
+                images: '',
+                audio: '',
+                route_ids: '',
+                source: '《鲁迅与他的北京》'
+            },
+            {
+                id: '009',
+                name: '国子监（含历史博物馆筹备处）',
+                Y: '5461',
+                X: '3147',
+                category: '工作地',
+                address: '安定门内成贤街（元明清三朝最高学府）',
+                zoom: '1',
+                short_text: '国子监（含历史博物馆筹备处）（1912–1918 年为密集阶段，）',
+                full_text: '<strong>地点名称：</strong>国子监（含历史博物馆筹备处）<br><strong>详细地址：</strong>安定门内成贤街（元明清三朝最高学府）<br><strong>地点类型：</strong>工作地<br><strong>时间段：</strong>1912–1918 年为密集阶段，<br><strong>相关历史事件：</strong>民国初期社会变革<br><strong>主要活动：</strong>1. 1912 年 7 月考察，拟设历史博物馆，1914 年 6 月正式设立筹备处，负责文物搜集；2. 无偿捐赠瓦当、大镜等文物，1913 年为莱比锡 "万国博览会" 筹备展品并深夜守护；3. 1918 年整理 "大内档案"，揭露官僚失职；4. 因祭孔、检查博物馆事务频繁前往，1925 年 4 月带女师大学生参观<br><strong>相关人物：</strong>马衡、傅增湘、女师大学生<br><strong>现状说明：</strong>1. 现为国子监博物馆，建筑修饰一新；2. 历史博物馆筹备处痕迹无存，原址划入国子监景区<br><strong>备注：</strong>密集阶段',
+                images: '',
+                audio: '',
+                route_ids: '',
+                source: '《鲁迅与他的北京》'
+            },
+            {
+                id: '010',
+                name: '孔庙（与国子监关联公务）',
+                Y: '5440',
+                X: '3198',
+                category: '工作地',
+                address: '国子监东侧（元明清祭祀孔子场所）',
+                zoom: '1',
+                short_text: '孔庙（与国子监关联公务）（1912.6-1924. 秋（公务参与））',
+                full_text: '<strong>地点名称：</strong>孔庙（与国子监关联公务）<br><strong>详细地址：</strong>国子监东侧（元明清祭祀孔子场所）<br><strong>地点类型：</strong>工作地<br><strong>时间段：</strong>1912.6-1924. 秋（公务参与）<br><strong>相关历史事件：</strong>民国初期社会变革<br><strong>主要活动：</strong>1. 1912 年 6 月随教育部考察，为筹备历史博物馆查看古物；2. 1913-1924 年每年春秋 "丁祭" 时，被派任执事，传递 "帛""爵" 等祭品，同事钱稻荪回忆 "举案齐眉" 递祭品；3. 日记中批判祭孔仪式 "荒陋可悼叹"<br><strong>相关人物：</strong>钱稻荪、教育部同事<br><strong>现状说明：</strong>1. 1981 年后重修并作为文物保护单位开放，不属于首都博物馆馆址。1989 年起举办祭孔表演；2. 保留进士题名碑，大成殿外月台为祭孔表演场地<br><strong>备注：</strong>公务参与',
+                images: '',
+                audio: '',
+                route_ids: '',
+                source: '《鲁迅与他的北京》'
+            },
+            {
+                id: '011',
+                name: '故宫（含午门、三大殿、古物陈列所）',
+                Y: '3987',
+                X: '2440',
+                category: '工作地',
+                address: '北京城正中（明清皇宫）',
+                zoom: '1',
+                short_text: '故宫（含午门、三大殿、古物陈列所）（1917.2-1925.7（公务与检查））',
+                full_text: '<strong>地点名称：</strong>故宫（含午门、三大殿、古物陈列所）<br><strong>详细地址：</strong>北京城正中（明清皇宫）<br><strong>地点类型：</strong>工作地<br><strong>时间段：</strong>1917.2-1925.7（公务与检查）<br><strong>相关历史事件：</strong>民国初期社会变革<br><strong>主要活动：</strong>1. 1917 年 2 月考察午门，拟设图书馆，12 月检查午门图书馆工作；2. 1920 年清理午门德文书（欧战战利品）；3. 1925 年 7 月到太和殿、保和殿检查沈阳文溯阁《四库全书》，筹备启运；4. 1914 年起关注古物陈列所（武英殿、文华殿），1917 年陪周作人参观<br><strong>相关人物：</strong>齐寿山、朱启铃、周作人<br><strong>现状说明：</strong>1. 午门、三大殿划入故宫博物院，对公众开放；2. 古物陈列所并入故宫，武英殿、文华殿保留<br><strong>备注：</strong>公务与检查',
+                images: '',
+                audio: '',
+                route_ids: '',
+                source: '《鲁迅与他的北京》'
+            }
+        ];
+    }
+
+    // *** 2. 地图初始化 ***
+    
+    function initializeMapWithImage(imageSrc, width, height) {
+        map = L.map('map', {
+            crs: L.CRS.Simple,
+            minZoom: -3, 
+            maxZoom: 3, 
+            zoomControl: true,
+        });
+
+        imageBounds = [[0, 0], [height, width]];
+        
+        L.imageOverlay(imageSrc, imageBounds).addTo(map);
+
+        map.fitBounds(imageBounds);
+        map.setMaxBounds(imageBounds);
+
+        console.log(`🗺️ 地图初始化成功: 图片=${imageSrc}, 尺寸=${width}x${height}`);
+        loadDataAndInitialize();
+    }
+    
+    function initializeMap() {
+        console.log(`🚀 开始初始化地图，图片: ${IMAGE_URL}`);
+        
+        const img = new Image();
+        img.onload = function() {
+            const width = this.width;
+            const height = this.height;
+            console.log(`📏 图片尺寸: ${width}x${height}`);
+            initializeMapWithImage(IMAGE_URL, width, height);
+        };
+        
+        img.onerror = function() {
+            console.error(`❌ 错误：无法加载地图图片 "${IMAGE_URL}"。`);
+            console.log('🔍 检查目录中的图片文件...');
+            // 尝试其他可能的图片文件名
+            const alternativeImages = [
+                'gigapixel-map_pekin1920_full.jpg',
+                'map_pekin1920_full.jpg'
+            ];
+            
+            let attemptCount = 0;
+            function tryNextImage() {
+                if (attemptCount < alternativeImages.length) {
+                    const testImg = alternativeImages[attemptCount];
+                    console.log(`📝 尝试加载: ${testImg}`);
+                    const test = new Image();
+                    test.onload = function() {
+                        console.log(`✅ 成功加载: ${testImg}`);
+                        initializeMapWithImage(testImg, this.width, this.height);
+                    };
+                    test.onerror = tryNextImage;
+                    test.src = testImg;
+                    attemptCount++;
+                } else {
+                    // 所有图片都加载失败
+                    document.getElementById('map').innerHTML = `
+                        <div style="display: flex; justify-content: center; align-items: center; height: 100%; background: #f8f9fa;">
+                            <div style="text-align: center; padding: 40px;">
+                                <div style="font-size: 48px; margin-bottom: 20px;">🗺️</div>
+                                <h3 style="color: #e74c3c; margin-bottom: 10px;">地图图片加载失败</h3>
+                                <p style="color: #7f8c8d;">请确保地图图片文件存在</p>
+                                <p style="color: #95a5a6; font-size: 14px;">尝试的文件: map_pekin1920_full.jpg, gigapixel-map_pekin1920_full.jpg</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            tryNextImage();
+        };
+        
+        img.src = IMAGE_URL;
+    }
+
+    // *** 3. 界面初始化 ***
+    
+    function initializeUI() {
+        // 侧边栏切换
+        const toggleBtn = document.getElementById('toggleSidebar');
+        const sidebar = document.getElementById('sidebar');
+        
+        toggleBtn.addEventListener('click', function() {
+            sidebar.classList.toggle('collapsed');
+            toggleBtn.classList.toggle('collapsed');
+            toggleBtn.innerHTML = sidebar.classList.contains('collapsed') ? '☰' : '✕';
+        });
+
+        // 搜索功能
+        const searchBox = document.getElementById('searchBox');
+        searchBox.addEventListener('input', function(e) {
+            filterLocations(e.target.value);
+        });
+
+        // 模态框关闭
+        const modal = document.getElementById('locationModal');
+        const closeBtn = document.querySelector('.close');
+        
+        closeModal = function() { 
+            modal.style.display = "none";
+            document.body.style.overflow = 'auto';
+        }
+        
+        closeBtn.onclick = closeModal;
+        
+        // 添加ESC键关闭
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+        
+        // 点击背景关闭（排除模态框内容和子元素）
+        modal.onclick = function(event) {
+            if (event.target === modal) { 
+                closeModal();
+            }
+        }
+        
+        // 阻止模态框内容的点击事件冒泡到背景
+        const modalContent = modal.querySelector('.modal-content');
+        if (modalContent) {
+            modalContent.onclick = function(event) {
+                event.stopPropagation();
+            };
+        }
+        
+        // 调试：添加人物链接点击监听
+        document.addEventListener('click', function(event) {
+            if (event.target.classList.contains('person-link')) {
+                console.log('🖱️ 点击了人物链接:', event.target.textContent);
+                console.log('🔗 目标URL:', event.target.href);
+                // 确保链接可以正常跳转，不阻止默认行为
+                return true;
+            }
+        }, true); // 使用捕获阶段
+    }
+
+    // *** 4. 分类菜单生成 ***
+    
+    function generateCategoryMenu(data) {
+        const categories = {};
+        data.forEach(location => {
+            const category = location.category || '其他';
+            if (!categories[category]) {
+                categories[category] = [];
+            }
+            categories[category].push(location);
+        });
+
+        const menuContainer = document.getElementById('categoryMenu');
+        menuContainer.innerHTML = '';
+
+        // 全部类别
+        const allSection = document.createElement('div');
+        allSection.className = 'category-section';
+        allSection.innerHTML = `
+            <div class="category-title active" data-category="全部">
+                <span>📍 全部地点</span>
+                <span class="category-count">${data.length}</span>
+            </div>
+            <ul class="location-list" id="locations-全部"></ul>
+        `;
+        menuContainer.appendChild(allSection);
+
+        // 各个类别
+        Object.entries(categories).forEach(([category, locations]) => {
+            const section = document.createElement('div');
+            section.className = 'category-section';
+            section.innerHTML = `
+                <div class="category-title" data-category="${category}">
+                    <span>${getCategoryIcon(category)} ${category}</span>
+                    <span class="category-count">${locations.length}</span>
+                </div>
+                <ul class="location-list" id="locations-${category}" style="display: none;"></ul>
+            `;
+            menuContainer.appendChild(section);
+        });
+
+        // 添加事件监听
+        document.querySelectorAll('.category-title').forEach(title => {
+            title.addEventListener('click', function() {
+                const category = this.dataset.category;
+                toggleCategory(category);
+            });
+        });
+
+        // 填充地点列表
+        Object.entries(categories).forEach(([category, locations]) => {
+            fillLocationList(category, locations);
+        });
+        fillLocationList('全部', data);
+
+        // 生成图例
+        generateLegend(categories);
+    }
+
+    function getCategoryIcon(category) {
+        const icons = {
+            '居住地': '🏠',
+            '工作地': '🏢',
+            '教书地': '🎓',
+            '餐饮地': '🍽️',
+            '购物地': '🛍️',
+            '风景名胜': '🏛️',
+            '会馆': '🏛️',
+            '医院': '🏥',
+            '避难所': '🛡️',
+            '杂志社': '📰',
+            '影剧院': '🎭'
+        };
+        return icons[category] || '📍';
+    }
+
+    function fillLocationList(category, locations) {
+        const listContainer = document.getElementById(`locations-${category}`);
+        if (!listContainer) return;
+
+        listContainer.innerHTML = '';
+        locations.forEach(location => {
+            const li = document.createElement('li');
+            li.className = 'location-item';
+            li.textContent = location.name;
+            li.addEventListener('click', () => {
+                focusLocation(location);
+            });
+            listContainer.appendChild(li);
+        });
+    }
+
+    function generateLegend(categories) {
+        const legendContainer = document.getElementById('legend');
+        legendContainer.innerHTML = '<h4 style="margin: 0 0 10px 0;">图例</h4>';
+        
+        Object.entries(categories).forEach(([category, locations]) => {
+            const item = document.createElement('div');
+            item.className = 'legend-item';
+            item.innerHTML = `
+                <div class="legend-marker" style="background-color: ${CATEGORY_COLORS[category] || '#95a5a6'}"></div>
+                <span>${getCategoryIcon(category)} ${category} (${locations.length})</span>
+            `;
+            legendContainer.appendChild(item);
+        });
+    }
+
+    function toggleCategory(category) {
+        // 更新标题状态
+        document.querySelectorAll('.category-title').forEach(title => {
+            title.classList.remove('active');
+        });
+        document.querySelector(`[data-category="${category}"]`).classList.add('active');
+
+        // 显示/隐藏地点列表
+        document.querySelectorAll('.location-list').forEach(list => {
+            list.style.display = 'none';
+        });
+        document.getElementById(`locations-${category}`).style.display = 'block';
+
+        // 过滤地图标记
+        currentFilter = category;
+        filterMarkers(category);
+        
+        // 更新统计
+        document.getElementById('currentCategory').textContent = category;
+    }
+
+    // *** 5. 地图标记渲染 ***
+    
+    function renderMarkers(data) {
+        console.log(`🚀 开始渲染标记，数据量: ${data.length}`);
+        
+        // 清除现有标记
+        markers.forEach(marker => map.removeLayer(marker));
+        markers = [];
+
+        let validMarkers = 0;
+        let invalidMarkers = 0;
+        const imageCoords = [];
+
+        data.forEach((location, index) => {
+            const y = parseInt(location.Y);
+            const x = parseInt(location.X);
+            
+            // 验证坐标有效性（允许坐标值为0的地点）
+            if (!isNaN(y) && !isNaN(x) && y >= 0 && x >= 0) {
+                imageCoords.push({name: location.name, y, x, category: location.category});
+                
+                const markerColor = CATEGORY_COLORS[location.category] || '#95a5a6';
+                
+                const customIcon = L.divIcon({
+                    className: `custom-marker category-marker-${location.category}`,
+                    iconSize: [16, 16],
+                    iconAnchor: [8, 8],
+                    html: `<div style="background-color: ${markerColor}; width: 100%; height: 100%; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.4); transition: all 0.3s ease;"></div>`
+                });
+
+                // 调试前几个坐标
+                if (index < 5) {
+                    console.log(`🎯 创建标记${index}: "${location.name}" -> 坐标[${y}, ${x}], 颜色: ${markerColor}`);
+                }
+
+                const marker = L.marker([y, x], { 
+                    icon: customIcon,
+                    category: location.category
+                }).addTo(map);
+
+                // 添加地点名称标签（默认隐藏，悔帐时显示）
+                const label = L.tooltip({
+                    permanent: false,  // 默认不显示
+                    direction: 'right',
+                    offset: [10, 0],
+                    opacity: 0.95,
+                    className: 'location-label'
+                });
+                label.setContent(location.name);
+                marker.bindTooltip(label);
+                
+                // 添加悔帐事件来云控制标签显示
+                marker.on('mouseover', function() {
+                    // 检查该标签是否应该显示（根据分类筛选）
+                    if (shouldShowLabel(location.category)) {
+                        this.openTooltip();
+                    }
+                });
+                
+                marker.on('mouseout', function() {
+                    this.closeTooltip();
+                });
+
+                marker.locationData = location;
+                
+                marker.on('click', function(e) {
+                    // 阻止默认行为和事件冒泡
+                    L.DomEvent.preventDefault(e);
+                    L.DomEvent.stopPropagation(e);
+                    L.DomEvent.stop(e);
+                    
+                    // 阻止地图移动
+                    e.originalEvent.preventDefault();
+                    
+                    // 显示详情弹窗
+                    showLocationModal(location);
+                    highlightLocationInList(location);
+                    
+                    return false;
+                });
+
+                // 防止拖拽导致的问题
+                marker.on('mousedown', function(e) {
+                    L.DomEvent.stop(e);
+                    return false;
+                });
+
+                marker.on('mouseup', function(e) {
+                    L.DomEvent.stop(e);
+                    return false;
+                });
+
+                // 移除 hover 缩放效果，保持地图点不动
+
+                markers.push(marker);
+                validMarkers++;
+            } else {
+                invalidMarkers++;
+                console.warn(`⚠️ 地点 "${location.name}" (ID: ${location.id}) 坐标无效: Y="${location.Y}", X="${location.X}"`);
+            }
+        });
+
+        // 输出坐标范围信息
+        if (imageCoords.length > 0) {
+            const yValues = imageCoords.map(c => c.y);
+            const xValues = imageCoords.map(c => c.x);
+            console.log(`📊 坐标范围: Y[${Math.min(...yValues)}-${Math.max(...yValues)}], X[${Math.min(...xValues)}-${Math.max(...xValues)}]`);
+            console.log(`📍 前5个有效坐标:`, imageCoords.slice(0, 5));
+        }
+
+        console.log(`📍 标记渲染完成: ${validMarkers} 个有效标记, ${invalidMarkers} 个无效标记`);
+        updateStats(data);
+        
+        // 自动调整地图视角到标记区域
+        if (validMarkers > 0) {
+            setTimeout(() => {
+                const group = new L.featureGroup(markers);
+                if (group.getLayers().length > 0) {
+                    map.fitBounds(group.getBounds().pad(0.1));
+                    console.log(`🗺️ 地图已调整视角到标记区域`);
+                }
+            }, 500);
+        }
+    }
+
+    function filterMarkers(category) {
+        markers.forEach(marker => {
+            if (category === '全部' || marker.locationData.category === category) {
+                marker.setStyle({ opacity: 1 });
+            } else {
+                marker.setStyle({ opacity: 0.3 });
+            }
+        });
+    }
+    
+    // 判断是否应该显示标签（根据当前分类筛选）
+    function shouldShowLabel(category) {
+        // 如果当前筛选是全部，或者是选中的分类，则显示标签
+        return currentFilter === '全部' || currentFilter === category;
+    }
+    
+    function filterMarkers(category) {
+        markers.forEach(marker => {
+            if (category === '全部' || marker.locationData.category === category) {
+                marker.setStyle({ opacity: 1 });
+            } else {
+                marker.setStyle({ opacity: 0.3 });
+            }
+        });
+    }
+
+    // *** 6. 交互功能 ***
+    
+    function filterLocations(searchTerm) {
+        const term = searchTerm.toLowerCase();
+        document.querySelectorAll('.location-item').forEach(item => {
+            const locationName = item.textContent.toLowerCase();
+            if (locationName.includes(term)) {
+                item.style.display = 'block';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
+
+    function focusLocation(location) {
+        const y = parseInt(location.Y);
+        const x = parseInt(location.X);
+        
+        if (!isNaN(y) && !isNaN(x)) {
+            map.setView([y, x], 1);
+            
+            // 找到对应的标记并触发点击
+            const targetMarker = markers.find(marker => 
+                marker.locationData.id === location.id
+            );
+            if (targetMarker) {
+                targetMarker.openPopup();
+                showLocationModal(location);
+            }
+        }
+        
+        highlightLocationInList(location);
+    }
+
+    function highlightLocationInList(location) {
+        // 清除所有高亮
+        document.querySelectorAll('.location-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        
+        // 高亮当前选中项
+        const currentCategory = document.querySelector('.category-title.active').dataset.category;
+        const listItems = document.querySelectorAll(`#locations-${currentCategory} .location-item`);
+        listItems.forEach(item => {
+            if (item.textContent === location.name) {
+                item.classList.add('active');
+                item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+    }
+
+    function showLocationModal(location) {
+        const modal = document.getElementById('locationModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalCategory = document.getElementById('modalCategory');
+        const modalBody = document.getElementById('modal-body');
+
+        modalTitle.textContent = location.name;
+        modalCategory.textContent = location.category || '其他';
+        
+        // 解析full_text中的结构化数据
+        const extractFullTextData = (fullText) => {
+            const data = {};
+            const patterns = {
+                '地点名称': /<strong>地点名称：<\/strong>(.+?)(<br>|$)/,
+                '详细地址': /<strong>详细地址：<\/strong>(.+?)(<br>|$)/,
+                '地点类型': /<strong>地点类型：<\/strong>(.+?)(<br>|$)/,
+                '时间段': /<strong>时间段：<\/strong>(.+?)(<br>|$)/,
+                '相关历史事件': /<strong>相关历史事件：<\/strong>(.+?)(<br>|$)/,
+                '主要活动': /<strong>主要活动：<\/strong>(.+?)(<strong>相关人物：|<strong>现状说明：|<strong>相关作品：|<strong>备注：|<br>|$)/s,
+                '相关人物': /<strong>相关人物：<\/strong>(.+?)(<strong>现状说明：|<strong>相关作品：|<strong>备注：|<br>|$)/s,
+                '现状说明': /<strong>现状说明：<\/strong>(.+?)(<strong>相关作品：|<strong>备注：|<br>|$)/s,
+                '相关作品': /<strong>相关作品：<\/strong>(.+?)(<strong>备注：|<br>|$)/s,
+                '备注': /<strong>备注：<\/strong>(.+?)(<br>|$)/s
+            };
+            
+            for (const [key, pattern] of Object.entries(patterns)) {
+                const match = fullText.match(pattern);
+                if (match && match[1]) {
+                    data[key] = match[1].replace(/<br>/g, '').trim();
+                }
+            }
+            
+            return data;
+        };
+        
+        const fullTextData = extractFullTextData(location.full_text || '');
+        
+        modalBody.innerHTML = `
+            <div class="detail-grid">
+                <div class="detail-item primary">
+                    <strong>🆔 地点编号</strong>
+                    <p>${location.id || '未知'}</p>
+                </div>
+                <div class="detail-item primary">
+                    <strong>🏛️ 地点类型</strong>
+                    <p>${fullTextData['地点类型'] || location.category || '其他'}</p>
+                </div>
+                <div class="detail-item secondary">
+                    <strong>📍 详细地址</strong>
+                    <p>${fullTextData['详细地址'] || location.address || '暂无地址信息'}</p>
+                </div>
+                <div class="detail-item secondary">
+                    <strong>📅 时间段</strong>
+                    <p>${fullTextData['时间段'] || location.short_text || '暂无时间信息'}</p>
+                </div>
+            </div>
+            
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <strong>⚡ 相关历史事件</strong>
+                    <p>${fullTextData['相关历史事件'] || '暂无相关历史事件记载'}</p>
+                </div>
+                <div class="detail-item">
+                    <strong>🎯 主要活动</strong>
+                    <p>${fullTextData['主要活动'] || extractMainActivity(location.full_text)}</p>
+                </div>
+                <div class="detail-item">
+                    <strong>👥 相关人物</strong>
+                    <p id="relatedPeopleList">${extractRelatedPeople(location.full_text)}</p>
+                </div>
+                <div class="detail-item">
+                    <strong>🏛️ 现状说明</strong>
+                    <p>${fullTextData['现状说明'] || extractStatus(location.full_text)}</p>
+                </div>
+            </div>
+            
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <strong>📚 相关作品</strong>
+                    <p>${fullTextData['相关作品'] || '暂无相关作品记载'}</p>
+                </div>
+                <div class="detail-item">
+                    <strong>📝 坐标信息</strong>
+                    <div class="coordinate-info">
+                        <span>Y: ${location.Y}</span>
+                        <span>X: ${location.X}</span>
+                        <span>缩放: ${location.zoom || '1'}</span>
+                    </div>
+                </div>
+                <div class="detail-item">
+                    <strong>📖 数据来源</strong>
+                    <p>${location.source || '《鲁迅与他的北京》'}</p>
+                </div>
+            </div>
+            
+            ${location.images ? `
+            <div class="detail-item">
+                <strong>🖼️ 相关图片</strong>
+                <p>${location.images}</p>
+            </div>
+            ` : ''}
+            
+            ${location.audio ? `
+            <div class="detail-item">
+                <strong>🎵 音频资料</strong>
+                <p>${location.audio}</p>
+            </div>
+            ` : ''}
+            
+            ${location.route_ids ? `
+            <div class="detail-item">
+                <strong>🛤️ 路线编号</strong>
+                <p>${location.route_ids}</p>
+            </div>
+            ` : ''}
+            
+            <div class="detail-item">
+                <strong>💬 备注</strong>
+                <p>${fullTextData['备注'] || '暂无备注信息'}</p>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="btn-network" onclick="showNetworkGraph('${location.name}')">
+                    🕸️ 查看社交关系网络
+                </button>
+            </div>
+        `;
+        
+        // 显示弹窗但阻止默认滚动行为
+        modal.style.display = "block";
+        
+        // 防止页面跳转
+        setTimeout(() => {
+            // 确保弹窗完全显示后再设置焦点
+            modal.focus();
+            document.body.style.overflow = 'hidden';
+            
+            // 确保人物链接正常工作 - 添加调试信息
+            const relatedPeopleList = document.getElementById('relatedPeopleList');
+            if (relatedPeopleList) {
+                const links = relatedPeopleList.querySelectorAll('.person-link');
+                console.log(`🔗 检测到 ${links.length} 个人物链接`);
+                links.forEach((link, index) => {
+                    console.log(`链接 ${index + 1}: ${link.textContent} -> ${link.href}`);
+                    // 确保链接可以正常工作
+                    link.style.pointerEvents = 'auto';
+                    link.style.zIndex = 'auto';
+                });
+            }
+        }, 100);
+    }
+
+    function updateStats(data) {
+        const totalLocations = data.length;
+        const markedLocations = data.filter(loc => {
+            const y = parseInt(loc.Y);
+            const x = parseInt(loc.X);
+            return !isNaN(y) && !isNaN(x) && y > 0 && x > 0;
+        }).length;
+
+        document.getElementById('totalLocations').textContent = totalLocations;
+        document.getElementById('markedLocations').textContent = markedLocations;
+        
+        console.log(`📊 统计信息更新: 总地点数=${totalLocations}, 已标注=${markedLocations}`);
+    }
+
+    // *** 7. 主初始化函数 ***
+    
+    async function loadDataAndInitialize() {
+        const csvFilePath = '地点数据_数据库格式.csv';
+        try {
+            console.log(`🚀 开始加载CSV文件: ${csvFilePath}`);
+            locationData = await loadCSV(csvFilePath);
+            console.log(`✅ CSV 数据加载成功，共 ${locationData.length} 条记录。`);
+            
+            // 显示前几条数据用于调试
+            console.log(`📋 前5条记录预览:`, locationData.slice(0, 5));
+            
+            // 生成分类菜单
+            generateCategoryMenu(locationData);
+            
+            // 渲染地图标记
+            renderMarkers(locationData);
+            
+        } catch (error) {
+            console.error("❌ 加载或解析 CSV 文件时出错:", error);
+            document.getElementById('map').innerHTML = `
+                <div style="display: flex; justify-content: center; align-items: center; height: 100%; background: #f8f9fa;">
+                    <div style="text-align: center; padding: 40px;">
+                        <div style="font-size: 48px; margin-bottom: 20px;">📊</div>
+                        <h3 style="color: #e74c3c; margin-bottom: 10px;">数据加载失败</h3>
+                        <p style="color: #7f8c8d;">请确保 '地点数据_数据库格式.csv' 文件存在且格式正确</p>
+                        <p style="color: #95a5a6; font-size: 14px; margin-top: 20px;">错误详情: ${error.message}</p>
+                        <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer;">重新加载</button>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // *** 9. 社交网络关系图处理（增强版）***
+
+    let socialNetworkData = null;
+    let currentNetworkFilter = '全部';
+
+    async function loadSocialNetworkData() {
+        try {
+            // 检测当前协议
+            const isFileProtocol = window.location.protocol === 'file:';
+            
+            if (!isFileProtocol) {
+                try {
+                    // 使用HTTP服务器加载社交网络数据
+                    const response = await fetch('./鲁迅社交关系（时间关联版）1127.csv');
+                    if (!response.ok) {
+                        throw new Error(`无法找到或加载社交网络CSV文件: ${response.statusText}`);
+                    }
+                    const csvText = await response.text();
+                    socialNetworkData = parseNetworkCSV(csvText);
+                    console.log('✅ 社交网络数据加载成功:', socialNetworkData.length, '条关系');
+                    return;
+                } catch (fetchError) {
+                    console.warn(`🔄 HTTP加载社交网络数据失败: ${fetchError.message}`);
+                }
+            }
+            
+            // 对于file://协议或HTTP失败的情况，使用内联数据
+            console.warn('⚠️ 社交网络数据加载失败，使用真实数据');
+            socialNetworkData = getRealNetworkData();
+            console.log('✅ 使用真实社交网络数据:', socialNetworkData.length, '条关系');
+        } catch (error) {
+            console.error('❌ 社交网络数据处理错误:', error);
+            socialNetworkData = [];
+        }
+    }
+
+    function parseNetworkCSV(csvText) {
+        const lines = csvText.trim().split('\n');
+        const headers = lines[0].split(',');
+        const data = [];
+
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i];
+            if (!line.trim()) continue;
+
+            const values = [];
+            let current = '';
+            let inQuotes = false;
+
+            for (let j = 0; j < line.length; j++) {
+                const char = line[j];
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    values.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            values.push(current.trim());
+
+            const person = {
+                id: values[0]?.trim() || '',
+                name: values[1]?.trim() || '',
+                relation: values[2]?.trim() || '',
+                events: []
+            };
+
+            for (let k = 3; k < values.length; k += 2) {
+                if (values[k]) {
+                    person.events.push({
+                        time: values[k],
+                        description: values[k + 1] || ''
+                    });
+                }
+            }
+
+            if (person.name) {
+                data.push(person);
+            }
+        }
+
+        return data;
+    }
+
+    function getRealNetworkData() {
+        return [
+            // 亲属关系
+            { id: '1', name: '周作人', relation: '亲属', events: [
+                { time: '1885年', description: '结识（兄弟）' },
+                { time: '1917年4月', description: '随鲁迅到北京' },
+                { time: '1912-1923年', description: '互通信件900通' },
+                { time: '1923年7月', description: '兄弟关系破裂，鲁迅搬出八道湾' }
+            ]},
+            { id: '2', name: '周建人', relation: '亲属', events: [
+                { time: '1888年', description: '结识（兄弟）' }
+            ]},
+            { id: '3', name: '羽太信子', relation: '亲属', events: [
+                { time: '1909年', description: '结识（弟媳）' }
+            ]},
+            { id: '4', name: '阮和孙', relation: '亲属', events: [
+                { time: '1885年', description: '结识（表兄）' },
+                { time: '1936年', description: '书信往来保持' }
+            ]},
+            { id: '5', name: '车耕南', relation: '亲属', events: [
+                { time: '不详', description: '结识（亲属）' }
+            ]},
+            { id: '6', name: '周销凤', relation: '亲属', events: [
+                { time: '不详', description: '结识（族伯）' },
+                { time: '1913年10月25日', description: '到教育部看鲁迅' },
+                { time: '1913年11月3日', description: '鲁迅回访并请吃饭' },
+                { time: '1917-1919年', description: '书信往来' }
+            ]},
+            { id: '7', name: '周丰一', relation: '亲属', events: [
+                { time: '1912年', description: '出生（侄儿）' },
+                { time: '1919年', description: '迁至北京，鲁迅常买食品和玩具' },
+                { time: '1923年', description: '鲁迅兄弟失和后不再来往' }
+            ]},
+            { id: '21', name: '鲁瑞', relation: '亲属', events: [
+                { time: '1881年', description: '结识（母亲）' },
+                { time: '1919年', description: '随鲁迅迁至北京八道湾' },
+                { time: '1924年', description: '随鲁迅迁至西三条21号院' },
+                { time: '1936年后', description: '鲁迅常给母亲写信' }
+            ]},
+            { id: '22', name: '朱安', relation: '亲属', events: [
+                { time: '1906年', description: '结婚' },
+                { time: '1919年', description: '随鲁迅全家迁到八道湾' },
+                { time: '1924年', description: '随鲁迅迁至砖塔胡同、西三条21号' },
+                { time: '1926年', description: '鲁迅南下后陪伴鲁迅母亲' }
+            ]},
+            { id: '26', name: '许广平', relation: '亲属', events: [
+                { time: '1925年3月11日', description: '首次写信给鲁迅（学生）' },
+                { time: '1926年', description: '与鲁迅同时离京南下' },
+                { time: '1927年9月', description: '与鲁迅同赴上海定居（夫人）' }
+            ]},
+
+            // 同乡关系
+            { id: '27', name: '许铭伯', relation: '同乡', events: [
+                { time: '1912年5月5日', description: '鲁迅初到北京当晚拜访' },
+                { time: '1913年', description: '鲁迅为其饯行' },
+                { time: '1921年7月1日', description: '许铭伯去世' }
+            ]},
+            { id: '28', name: '许诗荃', relation: '同乡', events: [
+                { time: '1912年', description: '与鲁迅同船到北京' },
+                { time: '1913年10月22日', description: '鲁迅出席其订婚宴' },
+                { time: '1926年8月', description: '鲁迅离京后失去联系' }
+            ]},
+            { id: '29', name: '宋紫佩', relation: '同乡', events: [
+                { time: '不详（1912年前）', description: '结识（同乡、学生、同事）' },
+                { time: '1913年3月30日', description: '到北京与鲁迅同住绍兴会馆' },
+                { time: '1926年后', description: '鲁迅托其照顾家人' }
+            ]},
+            { id: '30', name: '蔡国青', relation: '同乡', events: [
+                { time: '不详（日本留学）', description: '结识（同期留日）' },
+                { time: '1912年5月', description: '与鲁迅同至北京' },
+                { time: '1921年4月17日', description: '蔡国青去世，鲁迅给礼银' }
+            ]},
+            { id: '47', name: '马幼渔', relation: '同乡', events: [
+                { time: '1908年', description: '结识（同学）' },
+                { time: '1920年8月', description: '聘请鲁迅到北京大学讲授中国小说史' },
+                { time: '1934年', description: '保持和鲁迅的书信往来' }
+            ]},
+            { id: '51', name: '钱玄同', relation: '同乡', events: [
+                { time: '不详（日本留学）', description: '结识（同学）' },
+                { time: '1917年', description: '加入《新青年》，与鲁迅关系密切' },
+                { time: '1920年', description: '《新青年》编委会分化，关系渐渐疏远' }
+            ]},
+            { id: '75', name: '沈兼士', relation: '同乡', events: [
+                { time: '不详（1918年前）', description: '结识' },
+                { time: '1925年', description: '同鲁迅等发表《对于北京女子师范大学风潮宣言》' },
+                { time: '1926年', description: '随鲁迅赴厦门大学国文系任教' },
+                { time: '1932年', description: '邀请鲁迅到校演讲' }
+            ]},
+            { id: '108', name: '沈雁冰', relation: '同乡', events: [
+                { time: '1921年4月', description: '与鲁迅开始通信' },
+                { time: '1926年8月30日', description: '与鲁迅首次见面（在上海）' }
+            ]},
+            { id: '109', name: '许羡苏', relation: '同乡', events: [
+                { time: '1920年', description: '到北京投考，暂住八道湾周宅' },
+                { time: '1921年', description: '报考北京女师，鲁迅作保' },
+                { time: '1924年', description: '自北京女子高等师范学校毕业' },
+                { time: '1926年', description: '鲁迅南下后，帮鲁迅母亲料理家务' }
+            ]},
+            { id: '111', name: '郁达夫', relation: '同乡', events: [
+                { time: '不详（1923年前）', description: '结识' },
+                { time: '1923年', description: '与鲁迅同在北京大学任教，来往密切' },
+                { time: '1925年', description: '回京度假时拜访鲁迅' },
+                { time: '1926年', description: '回京度假时拜访鲁迅' }
+            ]},
+
+            // 同事关系
+            { id: '127', name: '许寿裳', relation: '同事', events: [
+                { time: '不详（日本留学）', description: '结识（同窗，最亲密朋友）' },
+                { time: '1909年', description: '回国邀鲁迅去浙江两级师范学堂任教' },
+                { time: '1912年', description: '向蔡元培推荐鲁迅到教育部工作' },
+                { time: '1925年8月', description: '鲁迅被免职，其愤而辞职' }
+            ]},
+            { id: '128', name: '蔡元培', relation: '同事', events: [
+                { time: '不详（1912年前）', description: '结识' },
+                { time: '1912年', description: '聘请鲁迅到教育部任职' },
+                { time: '1920年', description: '聘请鲁迅为北京大学讲师' },
+                { time: '1927年', description: '聘请鲁迅为特约撰述员' }
+            ]},
+            { id: '135', name: '齐寿山', relation: '同事', events: [
+                { time: '1912年', description: '结识（同事，密切朋友）' },
+                { time: '1917年', description: '张勋复辟时助鲁迅避难' },
+                { time: '1924年', description: '鲁迅购房时资金上帮忙' },
+                { time: '1925年', description: '鲁迅被免职，其辞职抗议' }
+            ]},
+            { id: '218', name: '章士钊', relation: '同事', events: [
+                { time: '1924年', description: '结识（同事，上司）' },
+                { time: '1924-1926年', description: '任司法总长兼教育总长' },
+                { time: '1925年', description: '鲁迅因支持女师大学生运动被他革职，鲁迅为此向平政院提出控告，取得胜利后复职' }
+            ]},
+
+            // 学生关系
+            { id: '221', name: '商契衡', relation: '学生', events: [
+                { time: '不详（1912年前）', description: '结识（学生）' },
+                { time: '1912年', description: '进入北京大学理科学习' },
+                { time: '1914-1915年', description: '常年向鲁迅借学费' }
+            ]},
+            { id: '242', name: '孙伏园', relation: '学生', events: [
+                { time: '不详（1912年前）', description: '结识（学生）' },
+                { time: '1919年', description: '兼任北京《国民公报·副刊》编辑' },
+                { time: '1920年', description: '兼任《晨报》编辑' }
+            ]},
+            { id: '243', name: '胡愈之', relation: '学生', events: [
+                { time: '不详（1912年前）', description: '结识（学生）' },
+                { time: '1921年11月', description: '因介绍爱罗先珂到北京大学任教与鲁迅开始书信往来' },
+                { time: '1926年8月30日', description: '鲁迅抵达上海的第二天，与鲁迅首次见面' }
+            ]},
+            { id: '247', name: '许钦文', relation: '学生', events: [
+                { time: '1920年', description: '结识（学生）' },
+                { time: '1923年', description: '经孙伏园介绍结识鲁迅' },
+                { time: '1926年', description: '短篇小说集《故乡》由鲁迅编选出版，列入《乌合从书》' }
+            ]},
+            { id: '276', name: '台静农', relation: '学生', events: [
+                { time: '1925年春', description: '初识鲁迅' },
+                { time: '1925年春', description: '后参加鲁迅发起成立的未名社' },
+                { time: '1925-1936年', description: '他们经常互访，鲁迅书信中有致台静农书信九十通' }
+            ]},
+            { id: '282', name: '韦素园', relation: '学生', events: [
+                { time: '不详（1925年前）', description: '结识（学生）' },
+                { time: '1925-1932年', description: '鲁迅与他交往密切，经常互访，讨论稿件' },
+                { time: '1929年', description: '鲁迅回北京探亲时曾专程看望他。他去世后鲁迅为他书写了碑记，并作《忆韦素园君》一文' }
+            ]},
+
+            // 其他重要人物
+            { id: '358', name: '胡适', relation: '其他', events: [
+                { time: '1918年至1920年', description: '共同参与《新青年》编辑工作' },
+                { time: '1924年前', description: '往来研究小说史' }
+            ]},
+            { id: '364', name: '李大钊', relation: '其他', events: [
+                { time: '1918年前后', description: '在《新青年》编辑会上相识并交往' }
+            ]},
+            { id: '366', name: '陈独秀', relation: '其他', events: [
+                { time: '1920年至1921年', description: '鲁迅经常寄稿件给他并有书信往来' }
+            ]},
+            { id: '371', name: '郑振铎', relation: '其他', events: [
+                { time: '1921年4月', description: '开始通信' },
+                { time: '1926年', description: '在上海首次见面' }
+            ]},
+            { id: '421', name: '林语堂', relation: '其他', events: [
+                { time: '1924年至1926年', description: '为《语丝》、《莽原》等撰稿' },
+                { time: '1926年3月7日', description: '同席于刘半农家宴' }
+            ]}
+        ];
+    }
+
+    function getSampleNetworkData() {
+        return [
+            { id: '1', name: '周作人', relation: '亲属', events: [{ time: '1885年', description: '结识（兄弟）' }] },
+            { id: '2', name: '周建人', relation: '亲属', events: [{ time: '1888年', description: '结识（兄弟）' }] },
+            { id: '3', name: '许寿裳', relation: '友人', events: [{ time: '1902年', description: '结识' }] },
+            { id: '4', name: '钱玄同', relation: '友人', events: [{ time: '1912年', description: '结识' }] }
+        ];
+    }
+
+    const relationColors = {
+        '亲属': { color: '#B44C43', bg: '#FFE5E5' },
+        '同乡': { color: '#4A5D75', bg: '#E5F0FF' },
+        '友人': { color: '#5F7156', bg: '#E5FFE8' },
+        '同事': { color: '#D9A033', bg: '#FFF8E5' },
+        '学生': { color: '#9B5F90', bg: '#F5E5FF' },
+        '其他': { color: '#8B7D6B', bg: '#F5F5F5' }
+    };
+
+    // 处理从关系网络页面跳转过来的URL参数
+    function handleUrlParameters() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const searchParam = urlParams.get('search');
+        const personParam = urlParams.get('person');
+        
+        if (searchParam) {
+            // 自动搜索并高亮相关人物
+            const decodedSearch = decodeURIComponent(searchParam);
+            console.log(`🔍 从关系网络页面跳转，自动搜索: ${decodedSearch}`);
+            
+            // 延迟执行，确保地图已加载
+            setTimeout(() => {
+                const searchBox = document.getElementById('searchBox');
+                if (searchBox) {
+                    searchBox.value = decodedSearch;
+                    searchBox.focus();
+                    
+                    // 触发搜索
+                    const searchEvent = new Event('input', { bubbles: true });
+                    searchBox.dispatchEvent(searchEvent);
+                }
+            }, 2000);
+        }
+        
+        if (personParam) {
+            // 显示提示信息
+            const decodedPerson = decodeURIComponent(personParam);
+            console.log(`👤 从关系网络页面跳转查看人物: ${decodedPerson}`);
+            
+            // 创建提示信息
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 100px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(245, 241, 232, 0.96);
+                border: 2px solid #C9A961;
+                border-radius: 8px;
+                padding: 15px 20px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+                z-index: 10000;
+                color: #5D4E37;
+                font-family: 'SimSun', '宋体', serif;
+                font-size: 14px;
+                max-width: 400px;
+                text-align: center;
+            `;
+            notification.innerHTML = `
+                <strong style="color: #C9A961;">🔗 从关系网络页面跳转</strong><br>
+                正在查找 <em style="color: #C9A961;">${decodedPerson}</em> 在地图中的相关地点<br>
+                <small style="opacity: 0.7;">请查看左侧地点列表或地图标记</small>
+            `;
+            document.body.appendChild(notification);
+            
+            // 5秒后自动移除提示
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 5000);
+        }
+    }
+
+    // 所有网络图相关函数已移至 network-module.js
+    // 该模块会在HTML加载后动态加载，提供以下全局函数：
+    // - showNetworkGraph(locationName)
+    // - closeNetworkModal()
+
+    // *** 8. 页面加载完成后初始化 ***
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // 检测是否使用file://协议
+        if (window.location.protocol === 'file:') {
+            const alert = document.getElementById('serverAlert');
+            if (alert) {
+                alert.style.display = 'block';
+            }
+            console.log('🔍 检测到file://协议，将提供备用加载方案');
+        }
+        
+        // 加载社交网络数据
+        loadSocialNetworkData();
+        
+        // 处理URL参数（从关系网络页面跳转过来）
+        handleUrlParameters();
+        
+        initializeUI();
+        initializeMap();
+    });
+
+</script>
+    <!-- 轻量节点/连线信息模态框 -->
+</body>
+</html>

@@ -1,0 +1,1684 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鲁迅的人情罗网 - 社交关系网络图</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', '微软雅黑', 'SimSun', '宋体', 'Arial Unicode MS', 'DejaVu Sans', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+            background: linear-gradient(135deg, #FFFCF8 0%, #F5F1E8 50%, #F9F5ED 100%);
+            overflow: hidden;
+            position: relative;
+            /* 背景纹理，与主图保持一致 */
+            background-image: 
+                /* 细腻噪点纹理 */
+                radial-gradient(circle at 20px 30px, rgba(0,0,0,0.03) 1px, transparent 2px),
+                radial-gradient(circle at 80px 90px, rgba(139,125,107,0.02) 1px, transparent 2px);
+            background-repeat: repeat, repeat;
+            background-position: 0 0, 0 0;
+            background-size: 140px 140px, 140px 140px;
+            background-attachment: scroll, scroll;
+            background-blend-mode: normal, normal;
+            background-color: #F5F1E8;
+        }
+
+        /* 宣纸纹理背景（简化，与主图一致） */
+        .paper-texture {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* 主容器 */
+        .main-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部标题区 - 与主图风格一致 */
+        .header {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            text-align: center;
+            background: rgba(245, 241, 232, 0.92);
+            padding: 15px 30px;
+            border-radius: 8px;
+            border: 2px solid #C9A961;
+            box-shadow: 5px 5px 10px rgba(0,0,0,0.15);
+        }
+
+        .main-title {
+            font-family: 'SimSun', '宋体', serif;
+            font-size: 28px;
+            font-weight: 700;
+            color: #5D4E37;
+            letter-spacing: 2px;
+            margin: 0;
+        }
+
+        .subtitle {
+            font-family: 'Kaiti', '楷体', serif;
+            font-size: 13px;
+            color: #8B7D6B;
+            margin-top: 5px;
+        }
+        
+        .back-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: #C9A961;
+            color: #FFFCF8;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: 'SimSun', '宋体', serif;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+        
+        .back-btn:hover {
+            background: #B8945A;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* 左侧筛选器 - 与主图风格一致 */
+        .filter-panel {
+            position: absolute;
+            left: 20px;
+            top: 100px;
+            width: 280px;
+            background: rgba(245, 241, 232, 0.96);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 5px 5px 10px rgba(0,0,0,0.15);
+            z-index: 10;
+            border: 2px solid #C9A961;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .filter-title {
+            font-family: 'SimSun', '宋体', serif;
+            font-size: 15px;
+            font-weight: 600;
+            color: #5D4E37;
+            margin-bottom: 15px;
+            padding: 8px 10px;
+            background: transparent;
+            border-bottom: 1px dashed #C9A961;
+            border-radius: 0;
+        }
+
+        .filter-btn {
+            display: block;
+            width: 100%;
+            padding: 10px 15px;
+            margin: 8px 0;
+            background: #F5F1E8;
+            border: 1px solid #C9A961;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #5D4E37;
+            transition: all 0.3s ease;
+            text-align: center;
+            font-family: 'SimSun', '宋体', serif;
+        }
+
+        .filter-btn:hover {
+            background: rgba(201, 169, 97, 0.08);
+            border-color: #C9A961;
+            color: #C9A961;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .filter-btn.active {
+            background: #C9A961;
+            color: #FFFCF8;
+            font-weight: bold;
+        }
+
+        /* 搜索框 - 与主图风格一致 */
+        .search-box {
+            margin-top: 20px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ecf0f1;
+            border-radius: 8px;
+            font-size: 14px;
+            background: rgba(255,255,255,0.9);
+            color: #5D4E37;
+            font-family: 'SimSun', '宋体', serif;
+            transition: border-color 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #C9A961;
+        }
+
+        .search-btn {
+            position: absolute;
+            right: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #C9A961;
+            border: none;
+            border-radius: 4px;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .search-btn:hover {
+            background: #B8945A;
+        }
+
+        /* 中央画布 */
+        .network-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+        }
+
+        #networkSvg {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 底部时间轴 - 与主图风格一致 */
+        .timeline-container {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 800px;
+            background: rgba(245, 241, 232, 0.96);
+            border-radius: 8px;
+            padding: 20px 30px;
+            box-shadow: 5px 5px 10px rgba(0,0,0,0.15);
+            z-index: 10;
+            border: 2px solid #C9A961;
+        }
+
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .year-display {
+            font-family: 'SimSun', '宋体', serif;
+            font-size: 32px;
+            color: #C9A961;
+            font-weight: 600;
+        }
+
+        .play-btn {
+            background: #C9A961;
+            border: none;
+            border-radius: 4px;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            color: white;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .play-btn:hover {
+            background: #B8945A;
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .timeline-slider {
+            position: relative;
+            height: 60px;
+            background: linear-gradient(90deg, #f8c471, #f9e79f, #ff6b35);
+            border-radius: 30px;
+            padding: 10px 20px;
+        }
+
+        .slider-track {
+            position: relative;
+            height: 8px;
+            background: rgba(255,255,255,0.6);
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+
+        .slider-progress {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            background: #ff6b35;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .slider-handle {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 24px;
+            height: 24px;
+            background: #ff6b35;
+            border: 3px solid white;
+            border-radius: 50%;
+            cursor: grab;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            transition: all 0.2s ease;
+        }
+
+        .slider-handle:active {
+            cursor: grabbing;
+            transform: translate(-50%, -50%) scale(1.2);
+        }
+
+        .year-markers {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* 右侧人物卡片 - 与主图风格一致 */
+        .bio-sidebar {
+            position: absolute;
+            right: -400px;
+            top: 80px;
+            width: 350px;
+            background: rgba(245, 241, 232, 0.96);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 5px 5px 10px rgba(0,0,0,0.15);
+            z-index: 15;
+            transition: right 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            border: 2px solid #C9A961;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .bio-sidebar.active {
+            right: 20px;
+        }
+
+        .bio-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px dashed #C9A961;
+        }
+
+        .bio-name {
+            font-family: 'SimSun', '宋体', serif;
+            font-size: 26px;
+            color: #5D4E37;
+            font-weight: 600;
+        }
+
+        .bio-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #8B7D6B;
+            transition: all 0.3s ease;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+
+        .bio-close:hover {
+            color: #C9A961;
+            background: rgba(201, 169, 97, 0.1);
+            transform: scale(1.1);
+        }
+
+        .bio-info {
+            margin-bottom: 20px;
+        }
+
+        .bio-label {
+            font-size: 14px;
+            color: #8B7D6B;
+            margin-bottom: 5px;
+            font-family: 'SimSun', '宋体', serif;
+        }
+
+        .bio-value {
+            font-size: 16px;
+            color: #5D4E37;
+            font-weight: bold;
+            margin-bottom: 15px;
+            font-family: 'SimSun', '宋体', serif;
+        }
+
+        .bio-events {
+            margin-top: 20px;
+        }
+
+        .bio-events-title {
+            font-family: 'SimSun', '宋体', serif;
+            font-size: 15px;
+            font-weight: bold;
+            color: #5D4E37;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 1px dashed #C9A961;
+        }
+        
+        .bio-actions {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px dashed #C9A961;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .bio-action-btn {
+            background: #C9A961;
+            color: #FFFCF8;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: 'SimSun', '宋体', serif;
+            transition: all 0.3s ease;
+            flex: 1;
+            min-width: 100px;
+        }
+        
+        .bio-action-btn:hover {
+            background: #B8945A;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .event-item {
+            background: rgba(255, 248, 240, 0.8);
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            border-left: 3px solid #C9A961;
+        }
+
+        .event-year {
+            font-weight: bold;
+            color: #C9A961;
+            margin-bottom: 4px;
+            font-size: 12px;
+        }
+
+        .event-desc {
+            color: #5D4E37;
+            font-size: 12px;
+            line-height: 1.4;
+            font-family: 'SimSun', '宋体', serif;
+        }
+
+        /* 图例 - 与主图风格一致 */
+        .legend {
+            position: absolute;
+            left: 20px;
+            bottom: 150px;
+            background: rgba(245, 241, 232, 0.96);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 5px 5px 10px rgba(0,0,0,0.15);
+            z-index: 10;
+            border: 2px solid #C9A961;
+            max-width: 220px;
+        }
+
+        .legend-title {
+            font-family: 'SimSun', '宋体', serif;
+            font-size: 12px;
+            font-weight: bold;
+            color: #5D4E37;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #C9A961;
+            padding-bottom: 6px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            padding: 4px 6px;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .legend-item:hover {
+            background: rgba(201, 169, 97, 0.1);
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            border: 1px solid #fff;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+        }
+
+        .legend-text {
+            font-size: 12px;
+            color: #5D4E37;
+            font-family: 'SimSun', '宋体', serif;
+        }
+
+        /* 节点样式 - 与主图风格一致 */
+        .node {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .node:hover {
+            filter: brightness(1.1);
+        }
+
+        .node-label {
+            font-family: 'SimSun', '宋体', serif;
+            font-size: 12px;
+            fill: #5D4E37;
+            pointer-events: none;
+            text-anchor: middle;
+        }
+
+        .link {
+            fill: none;
+            stroke: #999;
+            stroke-opacity: 0.6;
+            transition: all 0.3s ease;
+        }
+
+        .link:hover {
+            stroke-opacity: 1;
+            stroke-width: 3px;
+        }
+
+        .link.broken {
+            stroke-dasharray: 5,5;
+            stroke-opacity: 0.3;
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .main-title {
+                font-size: 28px;
+            }
+            
+            .filter-panel {
+                width: 160px;
+                left: 10px;
+                top: 80px;
+            }
+            
+            .bio-sidebar {
+                width: 280px;
+                right: -300px;
+            }
+            
+            .timeline-container {
+                width: 90%;
+                bottom: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="paper-texture"></div>
+    
+    <div class="main-container">
+        <!-- 顶部标题 -->
+        <div class="header">
+            <h1 class="main-title">鲁迅的人情罗网</h1>
+            <p class="subtitle">社交关系网络图 · 时空演变</p>
+            <button class="back-btn" onclick="window.location.href='主图.html'" title="返回主图">
+                ← 返回主图
+            </button>
+        </div>
+
+        <!-- 左侧筛选器 -->
+        <div class="filter-panel">
+            <h3 class="filter-title">关系筛选</h3>
+            <button class="filter-btn active" data-filter="all">全部关系</button>
+            <button class="filter-btn" data-filter="亲属">亲属</button>
+            <button class="filter-btn" data-filter="学生">学生</button>
+            <button class="filter-btn" data-filter="同事">同事</button>
+            <button class="filter-btn" data-filter="同乡">同乡</button>
+            <button class="filter-btn" data-filter="友人">友人</button>
+            <button class="filter-btn" data-filter="其他">其他</button>
+            
+            <div class="search-box">
+                <input type="text" class="search-input" placeholder="搜索人物..." id="searchInput">
+                <button class="search-btn">🔍</button>
+            </div>
+        </div>
+
+        <!-- 中央画布 -->
+        <div class="network-canvas">
+            <svg id="networkSvg"></svg>
+        </div>
+
+        <!-- 图例 -->
+        <div class="legend">
+            <h4 class="legend-title">关系图例</h4>
+            <div class="legend-item" data-filter="all" onclick="filterByCategory('all')">
+                <div class="legend-color" style="background: linear-gradient(45deg, #e74c3c, #3498db, #f39c12, #2ecc71, #9b59b6, #34495e);"></div>
+                <span class="legend-text">全部关系</span>
+            </div>
+            <div class="legend-item" data-filter="亲属" onclick="filterByCategory('亲属')">
+                <div class="legend-color" style="background: #e74c3c;"></div>
+                <span class="legend-text">亲属</span>
+            </div>
+            <div class="legend-item" data-filter="学生" onclick="filterByCategory('学生')">
+                <div class="legend-color" style="background: #3498db;"></div>
+                <span class="legend-text">学生</span>
+            </div>
+            <div class="legend-item" data-filter="同事" onclick="filterByCategory('同事')">
+                <div class="legend-color" style="background: #f39c12;"></div>
+                <span class="legend-text">同事</span>
+            </div>
+            <div class="legend-item" data-filter="同乡" onclick="filterByCategory('同乡')">
+                <div class="legend-color" style="background: #2ecc71;"></div>
+                <span class="legend-text">同乡</span>
+            </div>
+            <div class="legend-item" data-filter="友人" onclick="filterByCategory('友人')">
+                <div class="legend-color" style="background: #9b59b6;"></div>
+                <span class="legend-text">友人</span>
+            </div>
+            <div class="legend-item" data-filter="其他" onclick="filterByCategory('其他')">
+                <div class="legend-color" style="background: #34495e;"></div>
+                <span class="legend-text">其他</span>
+            </div>
+        </div>
+
+        <!-- 底部时间轴 -->
+        <div class="timeline-container">
+            <div class="timeline-header">
+                <div class="year-display" id="yearDisplay">1912</div>
+                <button class="play-btn" id="playBtn">▶</button>
+            </div>
+            <div class="timeline-slider">
+                <div class="slider-track">
+                    <div class="slider-progress" id="sliderProgress"></div>
+                    <div class="slider-handle" id="sliderHandle" style="left: 0%"></div>
+                </div>
+                <div class="year-markers">
+                    <span>1912</span>
+                    <span>1916</span>
+                    <span>1920</span>
+                    <span>1924</span>
+                    <span>1926</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧人物卡片 -->
+        <div class="bio-sidebar" id="bioSidebar">
+            <div class="bio-header">
+                <h2 class="bio-name" id="bioName">人物姓名</h2>
+                <button class="bio-close" id="bioClose">✕</button>
+            </div>
+            <div class="bio-info">
+                <div class="bio-label">关系类型</div>
+                <div class="bio-value" id="bioRelation">-</div>
+                
+                <div class="bio-label">相识时间</div>
+                <div class="bio-value" id="bioTime">-</div>
+                
+                <div class="bio-label">背景信息</div>
+                <div class="bio-value" id="bioBackground">-</div>
+            </div>
+            <div class="bio-events">
+                <h3 class="bio-events-title">重要事件</h3>
+                <div id="bioEventsList"></div>
+            </div>
+            <div class="bio-actions" id="bioActions" style="display: none;">
+                <button class="bio-action-btn" onclick="goToMainMap()" title="在主图中查看此人相关地点">
+                    📍 查看相关地点
+                </button>
+                <button class="bio-action-btn" onclick="sharePerson()" title="分享此人物信息">
+                    📤 分享人物
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>
+        // 真实数据 - 基于CSV文件中的鲁迅社交关系数据
+        const networkData = {
+            nodes: [
+                // 中心节点
+                {id: "luxun", name: "鲁迅", category: "center", radius: 30, color: "#ff6b35", year: 1912},
+                
+                // 亲属关系
+                {id: "zhouzuoren", name: "周作人", category: "亲属", radius: 20, color: "#e74c3c", year: 1885, brokenYear: 1923},
+                {id: "zhoujianren", name: "周建人", category: "亲属", radius: 18, color: "#e74c3c", year: 1888},
+                {id: "xuguangping", name: "许广平", category: "亲属", radius: 20, color: "#e74c3c", year: 1925},
+                {id: "lurui", name: "鲁瑞", category: "亲属", radius: 18, color: "#e74c3c", year: 1881},
+                {id: "zhuan", name: "朱安", category: "亲属", radius: 18, color: "#e74c3c", year: 1906},
+                {id: "yuxinzi", name: "羽太信子", category: "亲属", radius: 16, color: "#e74c3c", year: 1909},
+                {id: "ruhesun", name: "阮和孙", category: "亲属", radius: 16, color: "#e74c3c", year: 1885},
+                {id: "zhoufengyi", name: "周丰一", category: "亲属", radius: 15, color: "#e74c3c", year: 1912},
+                {id: "zhuoming", name: "朱可铭", category: "亲属", radius: 15, color: "#e74c3c", year: 1920},
+                
+                // 同乡关系
+                {id: "xushoushang", name: "许寿裳", category: "同乡", radius: 20, color: "#2ecc71", year: 1909},
+                {id: "qianxuantong", name: "钱玄同", category: "同乡", radius: 18, color: "#2ecc71", year: 1917},
+                {id: "caiyuanpei", name: "蔡元培", category: "同乡", radius: 18, color: "#2ecc71", year: 1912},
+                {id: "shenyinmo", name: "沈尹默", category: "同乡", radius: 17, color: "#2ecc71", year: 1913},
+                {id: "mayouyu", name: "马幼渔", category: "同乡", radius: 17, color: "#2ecc71", year: 1908},
+                {id: "shenjianshi", name: "沈兼士", category: "同乡", radius: 17, color: "#2ecc71", year: 1918},
+                {id: "xumianbo", name: "许羡苏", category: "同乡", radius: 16, color: "#2ecc71", year: 1920},
+                {id: "shenyantong", name: "沈雁冰", category: "同乡", radius: 18, color: "#2ecc71", year: 1921},
+                {id: "yudafu", name: "郁达夫", category: "同乡", radius: 17, color: "#2ecc71", year: 1923},
+                {id: "jiangyiji", name: "蒋抑卮", category: "同乡", radius: 16, color: "#2ecc71", year: 1902},
+                {id: "songzipai", name: "宋紫佩", category: "同乡", radius: 16, color: "#2ecc71", year: 1913},
+                {id: "zhuxizu", name: "朱希祖", category: "同乡", radius: 16, color: "#2ecc71", year: 1908},
+                {id: "xumingbo", name: "许铭伯", category: "同乡", radius: 15, color: "#2ecc71", year: 1912},
+                {id: "xushichen", name: "许诗荃", category: "同乡", radius: 15, color: "#2ecc71", year: 1912},
+                
+                // 同事关系
+                {id: "qishoushan", name: "齐寿山", category: "同事", radius: 17, color: "#f39c12", year: 1912},
+                {id: "zhangxiehou", name: "章士钊", category: "同事", radius: 16, color: "#f39c12", year: 1924},
+                {id: "xujishang", name: "许季上", category: "同事", radius: 16, color: "#f39c12", year: 1912},
+                {id: "chenqingyuan", name: "陈师曾", category: "同事", radius: 16, color: "#f39c12", year: 1913},
+                {id: "xujixuan", name: "徐吉轩", category: "同事", radius: 15, color: "#f39c12", year: 1912},
+                {id: "qiushanyuan", name: "裘善元", category: "同事", radius: 15, color: "#f39c12", year: 1912},
+                {id: "qiansuna", name: "钱稻孙", category: "同事", radius: 15, color: "#f39c12", year: 1912},
+                {id: "dailie", name: "戴螺舲", category: "同事", radius: 15, color: "#f39c12", year: 1912},
+                
+                // 学生关系
+                {id: "liubannong", name: "刘半农", category: "学生", radius: 17, color: "#3498db", year: 1918},
+                {id: "liuhezhen", name: "刘和珍", category: "学生", radius: 16, color: "#3498db", year: 1925},
+                {id: "sunfuyuan", name: "孙伏园", category: "学生", radius: 17, color: "#3498db", year: 1919},
+                {id: "huyuzhi", name: "胡愈之", category: "学生", radius: 16, color: "#3498db", year: 1921},
+                {id: "xuqinwen", name: "许钦文", category: "学生", radius: 16, color: "#3498db", year: 1920},
+                {id: "taijingnong", name: "台静农", category: "学生", radius: 16, color: "#3498db", year: 1925},
+                {id: "weisuyuan", name: "韦素园", category: "学生", radius: 16, color: "#3498db", year: 1925},
+                {id: "liyexia", name: "李霁野", category: "学生", radius: 15, color: "#3498db", year: 1925},
+                {id: "caojinghua", name: "曹靖华", category: "学生", radius: 15, color: "#3498db", year: 1922},
+                {id: "jingyoulin", name: "荆有麟", category: "学生", radius: 15, color: "#3498db", year: 1924},
+                {id: "changweijun", name: "常维钧", category: "学生", radius: 15, color: "#3498db", year: 1923},
+                {id: "xiangpeliang", name: "向培良", category: "学生", radius: 15, color: "#3498db", year: 1924},
+                
+                // 友人及其他
+                {id: "hushi", name: "胡适", category: "友人", radius: 18, color: "#9b59b6", year: 1918},
+                {id: "linda", name: "李大钊", category: "友人", radius: 17, color: "#9b59b6", year: 1918},
+                {id: "chenduxiu", name: "陈独秀", category: "友人", radius: 17, color: "#9b59b6", year: 1920},
+                {id: "zhengzhenduo", name: "郑振铎", category: "友人", radius: 16, color: "#9b59b6", year: 1921},
+                {id: "lingyutang", name: "林语堂", category: "友人", radius: 16, color: "#9b59b6", year: 1924},
+                {id: "lixiaofeng", name: "李小峰", category: "友人", radius: 15, color: "#9b59b6", year: 1923},
+                {id: "zhangfengju", name: "张凤举", category: "友人", radius: 15, color: "#9b59b6", year: 1921},
+                {id: "gaohanghong", name: "高长虹", category: "友人", radius: 15, color: "#9b59b6", year: 1924}
+            ],
+            links: [
+                // 亲属关系链接
+                {source: "luxun", target: "zhouzuoren", strength: 5, events: [
+                    {year: 1885, desc: "结识（兄弟）"},
+                    {year: 1917, desc: "随鲁迅到北京"},
+                    {year: 1912, desc: "互通信件900通"},
+                    {year: 1923, desc: "兄弟关系破裂，鲁迅搬出八道湾"}
+                ]},
+                {source: "luxun", target: "zhoujianren", strength: 3, events: [
+                    {year: 1888, desc: "结识（兄弟）"}
+                ]},
+                {source: "luxun", target: "xuguangping", strength: 4, events: [
+                    {year: 1925, desc: "首次写信给鲁迅（学生）"},
+                    {year: 1926, desc: "与鲁迅同时离京南下"},
+                    {year: 1927, desc: "与鲁迅同赴上海定居（夫人）"}
+                ]},
+                {source: "luxun", target: "lurui", strength: 4, events: [
+                    {year: 1881, desc: "结识（母亲）"},
+                    {year: 1919, desc: "随鲁迅迁至北京八道湾"},
+                    {year: 1924, desc: "随鲁迅迁至西三条21号院"},
+                    {year: 1936, desc: "鲁迅常给母亲写信"}
+                ]},
+                {source: "luxun", target: "zhuan", strength: 3, events: [
+                    {year: 1906, desc: "结婚"},
+                    {year: 1919, desc: "随鲁迅全家迁到八道湾"},
+                    {year: 1924, desc: "随鲁迅迁至砖塔胡同、西三条21号"},
+                    {year: 1926, desc: "鲁迅南下后陪伴鲁迅母亲"}
+                ]},
+                {source: "luxun", target: "yuxinzi", strength: 2, events: [
+                    {year: 1909, desc: "结识（弟媳）"}
+                ]},
+                {source: "luxun", target: "zhoufengyi", strength: 2, events: [
+                    {year: 1912, desc: "出生（侄儿）"},
+                    {year: 1919, desc: "迁至北京，鲁迅常买食品和玩具"},
+                    {year: 1923, desc: "鲁迅兄弟失和后不再来往"}
+                ]},
+
+                // 同乡关系链接
+                {source: "luxun", target: "xushoushang", strength: 5, events: [
+                    {year: 1909, desc: "结识（同窗，最亲密朋友）"},
+                    {year: 1912, desc: "向蔡元培推荐鲁迅到教育部工作"},
+                    {year: 1925, desc: "鲁迅被免职，其愤而辞职"}
+                ]},
+                {source: "luxun", target: "qianxuantong", strength: 4, events: [
+                    {year: 1917, desc: "加入《新青年》，与鲁迅关系密切"},
+                    {year: 1920, desc: "《新青年》编委会分化，关系渐渐疏远"}
+                ]},
+                {source: "luxun", target: "caiyuanpei", strength: 4, events: [
+                    {year: 1912, desc: "聘请鲁迅到教育部任职"},
+                    {year: 1920, desc: "聘请鲁迅为北京大学讲师"},
+                    {year: 1927, desc: "聘请鲁迅为特约撰述员"}
+                ]},
+                {source: "luxun", target: "shenyinmo", strength: 3, events: [
+                    {year: 1918, desc: "参与编辑《新青年》"},
+                    {year: 1925, desc: "与鲁迅等联名发表《关于北京女子师范大学风潮宣言》"}
+                ]},
+                {source: "luxun", target: "mayouyu", strength: 3, events: [
+                    {year: 1908, desc: "结识（同学）"},
+                    {year: 1920, desc: "聘请鲁迅到北京大学讲授中国小说史"}
+                ]},
+                {source: "luxun", target: "shenjianshi", strength: 3, events: [
+                    {year: 1918, desc: "结识"},
+                    {year: 1925, desc: "同鲁迅等发表《对于北京女子师范大学风潮宣言》"},
+                    {year: 1926, desc: "随鲁迅赴厦门大学国文系任教"}
+                ]},
+                {source: "luxun", target: "xumianbo", strength: 3, events: [
+                    {year: 1920, desc: "到北京投考，暂住八道湾周宅"},
+                    {year: 1921, desc: "报考北京女师，鲁迅作保"},
+                    {year: 1924, desc: "自北京女子高等师范学校毕业"},
+                    {year: 1926, desc: "鲁迅南下后，帮鲁迅母亲料理家务"}
+                ]},
+                {source: "luxun", target: "shenyantong", strength: 4, events: [
+                    {year: 1921, desc: "与鲁迅开始通信"},
+                    {year: 1926, desc: "与鲁迅首次见面（在上海）"}
+                ]},
+                {source: "luxun", target: "yudafu", strength: 3, events: [
+                    {year: 1923, desc: "与鲁迅同在北京大学任教，来往密切"},
+                    {year: 1925, desc: "回京度假时拜访鲁迅"},
+                    {year: 1926, desc: "回京度假时拜访鲁迅"}
+                ]},
+                {source: "luxun", target: "jiangyiji", strength: 2, events: [
+                    {year: 1902, desc: "同期到日本留学"},
+                    {year: 1909, desc: "资助出版《域外小说集》"}
+                ]},
+                {source: "luxun", target: "songzipai", strength: 3, events: [
+                    {year: 1913, desc: "到北京与鲁迅同住绍兴会馆"},
+                    {year: 1926, desc: "鲁迅托其照顾家人"}
+                ]},
+
+                // 同事关系链接
+                {source: "luxun", target: "qishoushan", strength: 4, events: [
+                    {year: 1912, desc: "结识（同事，密切朋友）"},
+                    {year: 1917, desc: "张勋复辟时助鲁迅避难"},
+                    {year: 1924, desc: "鲁迅购房时资金上帮忙"},
+                    {year: 1925, desc: "鲁迅被免职，其辞职抗议"}
+                ]},
+                {source: "luxun", target: "zhangxiehou", strength: 3, events: [
+                    {year: 1924, desc: "结识（同事，上司）"},
+                    {year: 1925, desc: "鲁迅因支持女师大学生运动被他革职，鲁迅为此向平政院提出控告"}
+                ]},
+                {source: "luxun", target: "xujishang", strength: 3, events: [
+                    {year: 1912, desc: "结识（同事，交往甚密）"},
+                    {year: 1914, desc: "促成鲁迅出资刻印《百喻经》"}
+                ]},
+                {source: "luxun", target: "chenqingyuan", strength: 3, events: [
+                    {year: 1913, desc: "到北京从事美术教育工作，与鲁迅友谊颇深"},
+                    {year: 1915, desc: "经常一起吃饭、畅谈，逛琉璃厂、小市"}
+                ]},
+                {source: "luxun", target: "xujixuan", strength: 3, events: [
+                    {year: 1912, desc: "结识（同事，好友）"},
+                    {year: 1925, desc: "来往密切，常在一起逛小市、买书籍互赠拓片"}
+                ]},
+
+                // 学生关系链接
+                {source: "luxun", target: "liubannong", strength: 3, events: [
+                    {year: 1918, desc: "《新青年》同人"},
+                    {year: 1920, desc: "北京大学共事"}
+                ]},
+                {source: "luxun", target: "liuhezhen", strength: 2, events: [
+                    {year: 1925, desc: "女师大风潮"},
+                    {year: 1926, desc: "三一八惨案，刘和珍牺牲，鲁迅写下《纪念刘和珍君》"}
+                ]},
+                {source: "luxun", target: "sunfuyuan", strength: 3, events: [
+                    {year: 1919, desc: "兼任北京《国民公报·副刊》编辑"},
+                    {year: 1920, desc: "兼任《晨报》编辑"}
+                ]},
+                {source: "luxun", target: "huyuzhi", strength: 2, events: [
+                    {year: 1921, desc: "因介绍爱罗先珂到北京大学任教与鲁迅开始书信往来"},
+                    {year: 1926, desc: "鲁迅抵达上海的第二天，与鲁迅首次见面"}
+                ]},
+                {source: "luxun", target: "xuqinwen", strength: 3, events: [
+                    {year: 1923, desc: "经孙伏园介绍结识鲁迅"},
+                    {year: 1926, desc: "短篇小说集《故乡》由鲁迅编选出版，列入《乌合从书》"}
+                ]},
+                {source: "luxun", target: "taijingnong", strength: 3, events: [
+                    {year: 1925, desc: "后参加鲁迅发起成立的未名社"},
+                    {year: 1936, desc: "他们经常互访，鲁迅书信中有致台静农书信九十通"}
+                ]},
+                {source: "luxun", target: "weisuyuan", strength: 3, events: [
+                    {year: 1925, desc: "在鲁迅发起和支持下，与韦素园、台静农等组织未名社"},
+                    {year: 1929, desc: "鲁迅回北京探亲时曾专程看望他。他去世后鲁迅为他书写了碑记，并作《忆韦素园君》一文"}
+                ]},
+                {source: "luxun", target: "liyexia", strength: 3, events: [
+                    {year: 1925, desc: "开始认识并写信给鲁迅"},
+                    {year: 1936, desc: "《鲁迅日记》中提及李霁野有247处，致他的书信也有二百多通"}
+                ]},
+
+                // 友人关系链接
+                {source: "luxun", target: "hushi", strength: 3, events: [
+                    {year: 1918, desc: "共同参与《新青年》编辑工作"},
+                    {year: 1924, desc: "往来研究小说史"}
+                ]},
+                {source: "luxun", target: "linda", strength: 2, events: [
+                    {year: 1918, desc: "在《新青年》编辑会上相识并交往"}
+                ]},
+                {source: "luxun", target: "chenduxiu", strength: 2, events: [
+                    {year: 1920, desc: "鲁迅经常寄稿件给他并有书信往来"}
+                ]},
+                {source: "luxun", target: "zhengzhenduo", strength: 2, events: [
+                    {year: 1921, desc: "开始通信"},
+                    {year: 1926, desc: "在上海首次见面"}
+                ]},
+                {source: "luxun", target: "lingyutang", strength: 2, events: [
+                    {year: 1924, desc: "为《语丝》、《莽原》等撰稿"},
+                    {year: 1926, desc: "同席于刘半农家宴"}
+                ]},
+                {source: "luxun", target: "lixiaofeng", strength: 2, events: [
+                    {year: 1923, desc: "首次在中央公园见面"},
+                    {year: 1924, desc: "共同创办《语丝》周刊"},
+                    {year: 1925, desc: "在鲁迅支持下创立北新书局"}
+                ]},
+                {source: "luxun", target: "zhangfengju", strength: 2, events: [
+                    {year: 1925, desc: "与鲁迅轮流编辑《国民新报·副刊》"},
+                    {year: 1929, desc: "互赠书籍、拓片及聚餐"}
+                ]},
+                {source: "luxun", target: "gaohanghong", strength: 2, events: [
+                    {year: 1924, desc: "初次晤见鲁迅"},
+                    {year: 1925, desc: "与鲁迅等合办《莽原》"}
+                ]}
+            ]
+        };
+
+        // 全局变量
+        let currentYear = 1912;
+        let isPlaying = false;
+        let selectedFilter = 'all';
+        let simulation, svg, g, link, node, label;
+        let width, height;
+
+        // 颜色映射
+        const categoryColors = {
+            'center': '#ff6b35',
+            '亲属': '#e74c3c',
+            '学生': '#3498db',
+            '同事': '#f39c12',
+            '同乡': '#2ecc71',
+            '友人': '#9b59b6',
+            '其他': '#34495e'
+        };
+
+        // 初始化
+        function init() {
+            setupCanvas();
+            setupTimeline();
+            setupFilters();
+            setupSearch();
+            setupBioSidebar();
+            createNetwork();
+            updateNetwork(currentYear);
+        }
+
+        // 设置画布
+        function setupCanvas() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+
+            svg = d3.select("#networkSvg")
+                .attr("width", width)
+                .attr("height", height);
+
+            // 添加缩放行为
+            const zoom = d3.zoom()
+                .scaleExtent([0.5, 3])
+                .on("zoom", (event) => {
+                    g.attr("transform", event.transform);
+                });
+
+            svg.call(zoom);
+
+            g = svg.append("g");
+        }
+
+        // 创建网络图
+        function createNetwork() {
+            // 创建力导向模拟
+            simulation = d3.forceSimulation(networkData.nodes)
+                .force("link", d3.forceLink(networkData.links)
+                    .id(d => d.id)
+                    .distance(d => 150 - d.strength * 20))
+                .force("charge", d3.forceManyBody().strength(-800))
+                .force("center", d3.forceCenter(width / 2, height / 2))
+                .force("collision", d3.forceCollide().radius(d => d.radius + 5));
+
+            // 创建连线
+            link = g.append("g")
+                .selectAll("line")
+                .data(networkData.links)
+                .enter().append("line")
+                .attr("class", "link")
+                .attr("stroke-width", d => Math.sqrt(d.strength) * 2)
+                .on("mouseover", function(event, d) {
+                    showLinkTooltip(event, d);
+                })
+                .on("mouseout", hideTooltip);
+
+            // 创建节点组
+            const nodeGroup = g.append("g")
+                .selectAll("g")
+                .data(networkData.nodes)
+                .enter().append("g")
+                .attr("class", "node")
+                .call(d3.drag()
+                    .on("start", dragStarted)
+                    .on("drag", dragged)
+                    .on("end", dragEnded));
+
+            // 添加节点圆圈
+            node = nodeGroup.append("circle")
+                .attr("r", d => d.radius)
+                .attr("fill", d => d.color)
+                .attr("stroke", "#fff")
+                .attr("stroke-width", 3)
+                .style("filter", "drop-shadow(0 4px 8px rgba(0,0,0,0.2))")
+                .on("click", handleNodeClick);
+
+            // 添加节点标签
+            label = nodeGroup.append("text")
+                .attr("class", "node-label")
+                .attr("dy", d => d.radius + 20)
+                .text(d => d.name);
+
+            // 更新模拟
+            simulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                nodeGroup
+                    .attr("transform", d => `translate(${d.x},${d.y})`);
+            });
+        }
+
+        // 更新网络图（根据年份）
+        function updateNetwork(year) {
+            currentYear = year;
+            
+            // 过滤节点
+            const visibleNodes = networkData.nodes.filter(d => d.year <= year);
+            const visibleNodeIds = new Set(visibleNodes.map(d => d.id));
+            
+            // 过滤连线
+            const visibleLinks = networkData.links.filter(d => 
+                visibleNodeIds.has(d.source.id || d.source) && 
+                visibleNodeIds.has(d.target.id || d.target)
+            );
+
+            // 更新连线
+            link = link.data(visibleLinks, d => `${d.source.id || d.source}-${d.target.id || d.target}`);
+            
+            link.exit()
+                .transition()
+                .duration(500)
+                .style("opacity", 0)
+                .remove();
+
+            const linkEnter = link.enter()
+                .append("line")
+                .attr("class", "link")
+                .attr("stroke-width", d => Math.sqrt(d.strength) * 2)
+                .style("opacity", 0);
+
+            link = linkEnter.merge(link);
+
+            // 检查断裂关系
+            link.classed("broken", d => {
+                if (d.source.id === "luxun" && d.target.id === "zhouzuoren" && year >= 1923) {
+                    return true;
+                }
+                return false;
+            });
+
+            link.transition()
+                .duration(500)
+                .style("opacity", d => {
+                    if (d.source.id === "luxun" && d.target.id === "zhouzuoren" && year >= 1923) {
+                        return 0.3;
+                    }
+                    return 0.6;
+                });
+
+            // 更新节点
+            const nodeGroup = g.select("g").selectAll(".node");
+            
+            nodeGroup.style("opacity", d => d.year <= year ? 1 : 0.1);
+
+            // 重新运行模拟
+            simulation.nodes(visibleNodes);
+            simulation.force("link").links(visibleLinks);
+            simulation.alpha(0.3).restart();
+
+            // 更新年份显示
+            document.getElementById('yearDisplay').textContent = year;
+        }
+
+        // 设置时间轴
+        function setupTimeline() {
+            const sliderHandle = document.getElementById('sliderHandle');
+            const sliderTrack = document.querySelector('.slider-track');
+            const playBtn = document.getElementById('playBtn');
+            
+            let isDragging = false;
+            let playInterval;
+
+            // 拖动功能
+            sliderHandle.addEventListener('mousedown', startDragging);
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', stopDragging);
+
+            function startDragging(e) {
+                isDragging = true;
+                sliderHandle.style.cursor = 'grabbing';
+            }
+
+            function drag(e) {
+                if (!isDragging) return;
+                
+                const rect = sliderTrack.getBoundingClientRect();
+                const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                const year = 1912 + Math.round(percent * 14);
+                
+                updateSliderPosition(percent);
+                updateNetwork(year);
+            }
+
+            function stopDragging() {
+                isDragging = false;
+                sliderHandle.style.cursor = 'grab';
+            }
+
+            // 点击轨道
+            sliderTrack.addEventListener('click', (e) => {
+                if (e.target === sliderHandle) return;
+                
+                const rect = sliderTrack.getBoundingClientRect();
+                const percent = (e.clientX - rect.left) / rect.width;
+                const year = 1912 + Math.round(percent * 14);
+                
+                updateSliderPosition(percent);
+                updateNetwork(year);
+            });
+
+            // 播放功能
+            playBtn.addEventListener('click', () => {
+                if (isPlaying) {
+                    stopPlaying();
+                } else {
+                    startPlaying();
+                }
+            });
+
+            function startPlaying() {
+                isPlaying = true;
+                playBtn.textContent = '⏸';
+                
+                let year = currentYear;
+                playInterval = setInterval(() => {
+                    if (year >= 1926) {
+                        stopPlaying();
+                        return;
+                    }
+                    
+                    year++;
+                    const percent = (year - 1912) / 14;
+                    updateSliderPosition(percent);
+                    updateNetwork(year);
+                }, 800);
+            }
+
+            function stopPlaying() {
+                isPlaying = false;
+                playBtn.textContent = '▶';
+                if (playInterval) {
+                    clearInterval(playInterval);
+                }
+            }
+
+            function updateSliderPosition(percent) {
+                sliderHandle.style.left = `${percent * 100}%`;
+                document.getElementById('sliderProgress').style.width = `${percent * 100}%`;
+            }
+        }
+
+        // 设置筛选器
+        function setupFilters() {
+            const filterBtns = document.querySelectorAll('.filter-btn');
+            
+            filterBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    filterByCategory(btn.dataset.filter);
+                });
+            });
+        }
+
+        // 应用筛选
+        function applyFilter() {
+            const nodeGroups = g.select("g").selectAll(".node");
+            const linkGroups = g.selectAll(".link");
+            
+            // 筛选节点
+            nodeGroups.style("opacity", d => {
+                if (selectedFilter === 'all') return 1;
+                if (d.id === 'luxun') return 1;
+                return d.category === selectedFilter ? 1 : 0.1;
+            });
+            
+            // 筛选连线
+            linkGroups.style("opacity", d => {
+                if (selectedFilter === 'all') return 0.6;
+                
+                // 获取源和目标节点
+                const sourceNode = typeof d.source === 'object' ? d.source : networkData.nodes.find(n => n.id === d.source);
+                const targetNode = typeof d.target === 'object' ? d.target : networkData.nodes.find(n => n.id === d.target);
+                
+                // 如果两端都是中心节点或都属于筛选类别，则显示
+                if (sourceNode.id === 'luxun' || targetNode.id === 'luxun') {
+                    const otherNode = sourceNode.id === 'luxun' ? targetNode : sourceNode;
+                    if (otherNode.category === selectedFilter || selectedFilter === 'all') {
+                        return 0.6;
+                    }
+                }
+                
+                return 0.05; // 其他连线透明度很低
+            });
+            
+            // 更新统计信息
+            updateFilterStats();
+        }
+        
+        // 更新筛选统计信息
+        function updateFilterStats() {
+            const visibleNodes = networkData.nodes.filter(d => {
+                if (selectedFilter === 'all') return true;
+                if (d.id === 'luxun') return true;
+                return d.category === selectedFilter;
+            });
+            
+            const statsElement = document.querySelector('.year-display');
+            if (statsElement && selectedFilter !== 'all') {
+                statsElement.innerHTML = `${currentYear}年<br><small style="font-size: 14px; opacity: 0.7;">(${selectedFilter}: ${visibleNodes.length}人)</small>`;
+            } else if (statsElement) {
+                statsElement.innerHTML = `${currentYear}年`;
+            }
+        }
+
+        // 设置搜索
+        function setupSearch() {
+            const searchInput = document.getElementById('searchInput');
+            const searchBtn = document.querySelector('.search-btn');
+            
+            const performSearch = () => {
+                const searchTerm = searchInput.value.trim();
+                if (!searchTerm) return;
+                
+                const foundNode = networkData.nodes.find(n => 
+                    n.name.includes(searchTerm)
+                );
+                
+                if (foundNode) {
+                    // 缩放到节点
+                    const transform = d3.zoomIdentity
+                        .translate(width / 2 - foundNode.x, height / 2 - foundNode.y)
+                        .scale(2);
+                    
+                    svg.transition()
+                        .duration(750)
+                        .call(d3.zoom().transform, transform);
+                    
+                    // 高亮节点
+                    g.selectAll(".node circle")
+                        .style("opacity", d => d.id === foundNode.id ? 1 : 0.3);
+                    
+                    // 显示人物卡片
+                    showBioSidebar(foundNode);
+                }
+            };
+            
+            searchBtn.addEventListener('click', performSearch);
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') performSearch();
+            });
+        }
+
+        // 设置人物卡片
+        function setupBioSidebar() {
+            const closeBtn = document.getElementById('bioClose');
+            closeBtn.addEventListener('click', hideBioSidebar);
+        }
+
+        // 处理节点点击
+        function handleNodeClick(event, d) {
+            showBioSidebar(d);
+        }
+
+        // 显示人物卡片
+        function showBioSidebar(person) {
+            const sidebar = document.getElementById('bioSidebar');
+            
+            document.getElementById('bioName').textContent = person.name;
+            document.getElementById('bioRelation').textContent = person.category;
+            document.getElementById('bioTime').textContent = `${person.year}年`;
+            
+            // 根据人物设置背景
+            const backgrounds = {
+                // 亲属
+                'zhouzuoren': '周作人，鲁迅的二弟，著名作家，1923年与鲁迅关系破裂，互通信件900通',
+                'zhoujianren': '周建人，鲁迅的三弟，生物学家，鲁迅支持其学业',
+                'xuguangping': '许广平，鲁迅的学生，后成为妻子，中山大学学生，1925年开始与鲁迅通信',
+                'lurui': '鲁瑞，鲁迅的母亲，一直由鲁迅赡养，1936年后鲁迅常给母亲写信',
+                'zhuan': '朱安，鲁迅的包办婚姻妻子，鲁迅南下后陪伴鲁迅母亲',
+                'yuxinzi': '羽太信子，周作人的妻子，鲁迅的弟媳',
+                'ruhesun': '阮和孙，鲁迅的表兄，1936年保持书信往来',
+                'zhoufengyi': '周丰一，鲁迅的侄儿，1919年迁至北京，鲁迅常买食品和玩具',
+                'zhuoming': '朱可铭，鲁迅的兄长，1920-1921年多次拜访鲁迅',
+                
+                // 同乡
+                'xushoushang': '许寿裳，鲁迅的挚友，教育家，鲁迅留学日本时的同学，最亲密朋友',
+                'qianxuantong': '钱玄同，著名学者，新文化运动重要人物，《新青年》编委',
+                'caiyuanpei': '蔡元培，教育家，北京大学校长，聘请鲁迅到教育部和北大任职',
+                'shenyinmo': '沈尹默，著名学者、书法家，参与编辑《新青年》',
+                'mayouyu': '马幼渔，北京大学教授，聘请鲁迅讲授中国小说史',
+                'shenjianshi': '沈兼士，著名学者，随鲁迅赴厦门大学国文系任教',
+                'xumianbo': '许羡苏，鲁迅的学生，1920年到北京投考，暂住八道湾周宅',
+                'shenyantong': '沈雁冰（茅盾），著名作家，1921年开始与鲁迅通信',
+                'yudafu': '郁达夫，著名作家，创造社成员，与鲁迅同在北京大学任教',
+                'jiangyiji': '蒋抑卮，鲁迅的留日同学，资助出版《域外小说集》',
+                'songzipai': '宋紫佩，鲁迅的同乡、学生、同事，1913年到北京与鲁迅同住绍兴会馆',
+                'zhuxizu': '朱希祖，著名史学家，鲁迅的留日同学，经常聚餐饮酒',
+                'xumingbo': '许铭伯，许寿裳的兄长，1912年鲁迅初到北京当晚拜访',
+                'xushichen': '许诗荃，1912年与鲁迅同船到北京，1913年鲁迅出席其订婚宴',
+                
+                // 同事
+                'qishoushan': '齐寿山，鲁迅的同乡，教育部同事，密切朋友，张勋复辟时助鲁迅避难',
+                'zhangxiehou': '章士钊，教育总长，鲁迅因支持女师大学生运动被他革职',
+                'xujishang': '许季上，教育部同事，交往甚密，促成鲁迅出资刻印《百喻经》',
+                'chenqingyuan': '陈师曾，著名画家，鲁迅的留日同学，友谊颇深',
+                'xujixuan': '徐吉轩，教育部同事，好友，来往密切，常一起逛小市买书籍',
+                'qiushanyuan': '裘善元，教育部同事，好友，常找鲁迅聊天，"夜裘子元来，至夜方去"',
+                'qiansuna': '钱稻孙，教育部同事，关系近，与鲁迅、许寿裳设计国徽图案',
+                'dailie': '戴螺舲，教育部同事，朋友，交往记录百余处，关系亲近',
+                
+                // 学生
+                'liubannong': '刘半农，诗人、语言学家，北京大学教授，《新青年》同人',
+                'liuhezhen': '刘和珍，北京女子师范大学学生，三一八惨案牺牲者',
+                'sunfuyuan': '孙伏园，作家，编辑，兼任北京《国民公报·副刊》和《晨报》编辑',
+                'huyuzhi': '胡愈之，著名出版家、翻译家，1921年因介绍爱罗先珂与鲁迅开始通信',
+                'xuqinwen': '许钦文，作家，经孙伏园介绍结识鲁迅，短篇小说集《故乡》由鲁迅编选出版',
+                'taijingnong': '台静农，作家，未名社成员，他们经常互访，鲁迅书信中有致台静农书信九十通',
+                'weisuyuan': '韦素园，作家，未名社成员，鲁迅与他交往密切，经常互访，讨论稿件',
+                'liyexia': '李霁野，翻译家，未名社成员，《鲁迅日记》中提及李霁野有247处',
+                'caojinghua': '曹靖华，翻译家，未名社成员，因王希礼俄译《阿Q正传》事与鲁迅通信',
+                'jingyoulin': '荆有麟，作家，《莽原》撰稿人，学校停办后鲁迅介绍其任京报馆校对',
+                'changweijun': '作家，未名社成员，经常拜访鲁迅，和鲁迅互有赠书',
+                'xiangpeliang': '向培良，作家，《莽原》撰稿人，1924年与鲁迅交往频繁',
+                
+                // 友人及其他
+                'hushi': '胡适，学者，新文化运动领袖，共同参与《新青年》编辑工作',
+                'linda': '李大钊，革命家，中国共产党创始人，在《新青年》编辑会上相识并交往',
+                'chenduxiu': '陈独秀，革命家，中国共产党创始人，1920年至1921年鲁迅经常寄稿件给他',
+                'zhengzhenduo': '郑振铎，作家、学者，1921年开始通信，1926年在上海首次见面',
+                'lingyutang': '林语堂，作家、学者，为《语丝》、《莽原》等撰稿',
+                'lixiaofeng': '李小峰，出版家，共同创办《语丝》周刊，在鲁迅支持下创立北新书局',
+                'zhangfengju': '张凤举，作家、学者，与鲁迅轮流编辑《国民新报·副刊》，互赠书籍',
+                'gaohanghong': '高长虹，作家，1924年初次晤见鲁迅，与鲁迅等合办《莽原》'
+            };
+            
+            document.getElementById('bioBackground').textContent = 
+                backgrounds[person.id] || '鲁迅的重要关系人物';
+            
+            // 显示相关事件
+            const eventsList = document.getElementById('bioEventsList');
+            eventsList.innerHTML = '';
+            
+            const relatedLinks = networkData.links.filter(l => 
+                (l.source.id === person.id || l.source === person.id) || 
+                (l.target.id === person.id || l.target === person.id)
+            );
+            
+            relatedLinks.forEach(link => {
+                if (link.events) {
+                    link.events.forEach(event => {
+                        const eventDiv = document.createElement('div');
+                        eventDiv.className = 'event-item';
+                        eventDiv.innerHTML = `
+                            <div class="event-year">${event.year}年</div>
+                            <div class="event-desc">${event.desc}</div>
+                        `;
+                        eventsList.appendChild(eventDiv);
+                    });
+                }
+            });
+            
+            // 显示操作按钮
+            const bioActions = document.getElementById('bioActions');
+            if (bioActions) {
+                bioActions.style.display = 'flex';
+            }
+            
+            sidebar.classList.add('active');
+        }
+
+        // 隐藏人物卡片
+        function hideBioSidebar() {
+            document.getElementById('bioSidebar').classList.remove('active');
+        }
+
+        // 跳转到主图查看相关地点
+        function goToMainMap() {
+            const bioName = document.getElementById('bioName').textContent;
+            if (bioName && bioName !== '人物姓名') {
+                // 构造URL，传递人物名称参数
+                const mainMapUrl = `主图.html?search=${encodeURIComponent(bioName)}`;
+                window.open(mainMapUrl, '_blank');
+            }
+        }
+
+        // 分享人物信息
+        function sharePerson() {
+            const bioName = document.getElementById('bioName').textContent;
+            const bioRelation = document.getElementById('bioRelation').textContent;
+            const bioBackground = document.getElementById('bioBackground').textContent;
+            
+            if (bioName && bioName !== '人物姓名') {
+                const shareText = `📚 ${bioName}\n🏷️ 关系：${bioRelation}\n📝 简介：${bioBackground}\n🔗 来自：鲁迅的人情罗网`;
+                
+                // 尝试使用Web Share API
+                if (navigator.share) {
+                    navigator.share({
+                        title: `${bioName} - 鲁迅的人情罗网`,
+                        text: shareText
+                    }).catch(err => {
+                        console.log('分享失败，使用备用方法:', err);
+                        fallbackShare(shareText);
+                    });
+                } else {
+                    fallbackShare(shareText);
+                }
+            }
+        }
+
+        // 备用分享方法
+        function fallbackShare(text) {
+            // 复制到剪贴板
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text).then(() => {
+                    alert('✅ 人物信息已复制到剪贴板，可以粘贴分享了！');
+                }).catch(err => {
+                    console.error('复制失败:', err);
+                });
+            } else {
+                // 传统方法：创建临时文本区域
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert('✅ 人物信息已复制到剪贴板，可以粘贴分享了！');
+                } catch (err) {
+                    console.error('复制失败:', err);
+                }
+                document.body.removeChild(textArea);
+            }
+        }
+
+        // 更新图例状态
+        function updateLegendState() {
+            const legendItems = document.querySelectorAll('.legend-item');
+            legendItems.forEach(item => {
+                const filter = item.dataset.filter;
+                if (filter === selectedFilter) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        }
+
+        // 通过图例筛选类别
+        function filterByCategory(category) {
+            selectedFilter = category;
+            
+            // 更新按钮状态
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.filter === category) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            // 更新图例项状态
+            document.querySelectorAll('.legend-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.dataset.filter === category) {
+                    item.classList.add('active');
+                }
+            });
+            
+            // 应用筛选
+            applyFilter();
+        }
+
+        // 显示连线提示
+        function showLinkTooltip(event, linkData) {
+            // 这里可以添加更复杂的提示框
+            console.log('Link data:', linkData);
+        }
+
+        function hideTooltip() {
+            // 隐藏提示框
+        }
+
+        // 拖拽功能
+        function dragStarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragEnded(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+
+        // 窗口大小调整
+        window.addEventListener('resize', () => {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            
+            svg.attr("width", width).attr("height", height);
+            simulation.force("center", d3.forceCenter(width / 2, height / 2));
+            simulation.alpha(0.3).restart();
+        });
+
+        // URL参数解析功能
+        function getUrlParameter(name) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name);
+        }
+        
+        // 根据URL参数自动搜索并高亮指定人物
+        function highlightPersonFromUrl() {
+            const personName = getUrlParameter('person');
+            if (personName) {
+                console.log(`🔍 查找人物: ${decodeURIComponent(personName)}`);
+                
+                // 延迟执行，确保网络图已经渲染完成
+                setTimeout(() => {
+                    const decodedPerson = decodeURIComponent(personName);
+                    const foundNode = networkData.nodes.find(n => 
+                        n.name === decodedPerson || n.name.includes(decodedPerson)
+                    );
+                    
+                    if (foundNode) {
+                        console.log(`✅ 找到人物: ${foundNode.name}`);
+                        
+                        // 缩放到节点
+                        const transform = d3.zoomIdentity
+                            .translate(width / 2 - foundNode.x, height / 2 - foundNode.y)
+                            .scale(2.5);
+                        
+                        svg.transition()
+                            .duration(750)
+                            .call(d3.zoom().transform, transform);
+                        
+                        // 高亮节点
+                        g.selectAll(".node circle")
+                            .style("opacity", d => d.id === foundNode.id ? 1 : 0.2)
+                            .style("stroke-width", d => d.id === foundNode.id ? 5 : 2);
+                        
+                        g.selectAll(".node text")
+                            .style("opacity", d => d.id === foundNode.id ? 1 : 0.2);
+                        
+                        g.selectAll(".link")
+                            .style("opacity", 0.1);
+                        
+                        // 显示人物卡片
+                        showBioSidebar(foundNode);
+                        
+                        // 更新页面标题
+                        document.querySelector('.main-title').textContent = `鲁迅的人情罗网 - ${foundNode.name}`;
+                        document.querySelector('.subtitle').textContent = `从主图跳转查看 ${foundNode.name} 的社交关系`;
+                        
+                    } else {
+                        console.warn(`⚠️ 未找到人物: ${decodedPerson}`);
+                        // 显示提示信息
+                        const alertDiv = document.createElement('div');
+                        alertDiv.style.cssText = `
+                            position: fixed;
+                            top: 80px;
+                            left: 50%;
+                            transform: translateX(-50%);
+                            background: rgba(245, 241, 232, 0.96);
+                            border: 2px solid #e74c3c;
+                            border-radius: 8px;
+                            padding: 15px 20px;
+                            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+                            z-index: 1000;
+                            color: #5D4E37;
+                            font-family: 'SimSun', serif;
+                            max-width: 400px;
+                            text-align: center;
+                        `;
+                        alertDiv.innerHTML = `
+                            <strong style="color: #e74c3c;">未找到人物</strong><br>
+                            未在关系网络中找到"${decodedPerson}"，请检查人物名称是否正确。
+                            <br><br>
+                            <small>提示：部分人物可能有别名或不同称谓。</small>
+                        `;
+                        document.body.appendChild(alertDiv);
+                        
+                        // 3秒后自动移除提示
+                        setTimeout(() => {
+                            if (alertDiv.parentNode) {
+                                alertDiv.parentNode.removeChild(alertDiv);
+                            }
+                        }, 5000);
+                    }
+                }, 1000);
+            }
+        }
+
+        // 启动应用
+        init();
+        
+        // 页面加载完成后检查URL参数
+        highlightPersonFromUrl();
+        
+        // 初始化图例点击状态
+        updateLegendState();
+        
+        // 添加返回主图的链接功能
+        window.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                // ESC键返回主图
+                window.close(); // 如果是弹窗
+                // 或者跳转回主图
+                // window.location.href = '主图.html';
+            }
+        });
+    </script>
+</body>
+</html>
